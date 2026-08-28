@@ -1,0 +1,41 @@
+# Build output
+build/
+out/
+cmake-build-*/
+
+# Object / dependency files
+*.o
+*.obj
+*.d
+*.gch
+*.pch
+
+# Libraries and executables
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+
+# Debug
+*.dSYM/
+*.pdb
+*.ilk
+*.su
+
+# Editors / tooling
+.vscode/
+.idea/
+compile_commands.json
+.cache/
+
+# Local, never committed: real device settings hold broker credentials
+taiseia-bridge.conf
+*.local.conf
+
+# Standards documents are licensed for individual purchase and are watermarked
+# per download. They must never enter this repository.
+*.pdf
