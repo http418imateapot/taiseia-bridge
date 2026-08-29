@@ -51,6 +51,7 @@ extern int g_failures;
 
 void test_json(void);
 void test_frame(void);
+void test_frame_mb(void);
 void test_datatype(void);
 void test_registration(void);
 void test_sim_link(void);

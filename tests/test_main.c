@@ -11,6 +11,7 @@ int main(void)
 {
     test_json();
     test_frame();
+    test_frame_mb();
     test_datatype();
     test_registration();
     test_sim_link();

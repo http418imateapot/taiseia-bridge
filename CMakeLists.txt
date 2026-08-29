@@ -129,6 +129,7 @@ if(TSB_BUILD_TESTS)
         tests/test_main.c
         tests/test_json.c
         tests/test_frame.c
+        tests/test_frame_mb.c
         tests/test_datatype.c
         tests/test_registration.c
         tests/test_sim_link.c

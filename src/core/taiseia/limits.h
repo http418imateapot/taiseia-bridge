@@ -36,6 +36,31 @@
  * bytes are present whether or not the operation carries a value. */
 #define TS_GENERAL_REQ_LEN      6u
 
+/* ------------------------------------------------- multi-byte data format --
+ *
+ * A different packet layout, used by appliances that report values wider than
+ * two bytes -- meters and sensors. The header is longer and carries the data
+ * type and item count that the general format has nowhere to put:
+ *
+ *   [0] length  [1] SA id  [2] R/W + service  [3] reserved
+ *   [4..5] fragment  [6] data type  [7..8] item count  [9..] data  [N-1] xor
+ */
+#define TS_MB_OVERHEAD          10u
+#define TS_MB_DATA_OFFSET       9u
+#define TS_MB_RESERVED          0xFFu
+
+/* The count field of a read request: we are asking, not telling. */
+#define TS_MB_COUNT_UNSPECIFIED 0xFFFFu
+
+/*
+ * A reply too long for one packet arrives in several, numbered downwards, and
+ * they are reassembled before anything above the transport sees them. The
+ * ceiling is ours, not the protocol's: a device sending more than this is
+ * refused rather than truncated, because a truncated capability list or a
+ * truncated batch of readings looks plausible and is wrong.
+ */
+#define TS_REASSEMBLY_MAX       1024u
+
 /* -------------------------------------------------------- service and role --
  *
  * Byte 2 packs the access direction into the top bit and the service id into
@@ -87,5 +112,8 @@ TS_STATIC_ASSERT((TS_SVC_ID_MASK & TS_SVC_WRITE_BIT) == 0, service_byte_split);
 TS_STATIC_ASSERT(TS_REG_FRAME_OVERHEAD < TS_FRAME_OVERHEAD,  reg_has_no_svc_byte);
 TS_STATIC_ASSERT(TS_DATA_MAX >= TS_FRAME_MAX_LEN - TS_FRAME_OVERHEAD,
                                                              data_max_covers_all);
+TS_STATIC_ASSERT(TS_MB_OVERHEAD > TS_FRAME_MIN_LEN,          mb_header_is_longer);
+TS_STATIC_ASSERT(TS_MB_DATA_OFFSET + 1u == TS_MB_OVERHEAD,   mb_offsets_agree);
+TS_STATIC_ASSERT(TS_REASSEMBLY_MAX >= TS_DATA_MAX,           reassembly_holds_one);
 
 #endif /* TSB_CORE_TAISEIA_LIMITS_H */
