@@ -16,7 +16,10 @@ adapters/taiseia_uart ──▶ ports/serial.h ◀── adapters/{posix,win32,.
 
 Pick the seam by what your target replaces:
 
-- **A new operating system** — implement `ports/serial.h`. Around 150 lines.
+- **A new operating system** — implement `ports/serial.h` and `ports/socket.h`,
+  and the small clock and logging entry points in `adapters/platform.h`. The
+  POSIX and Windows files are deliberately the same shape; read them as a pair
+  and the difference that matters will stand out.
 - **A new appliance protocol** (Modbus, a vendor gateway) — implement
   `ports/appliance_link.h`. Framing is yours; do not try to reuse the TaiSEIA
   packet layer, which is a different wire format.
