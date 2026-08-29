@@ -42,7 +42,10 @@ tables, which are not in this repository — see
   "attributes": {
     "0":  1,
     "7": 62,
-    "21": 45                  // a bit type: the raw value, not expanded
+    "21": 45,                 // a bit type: the raw value, not expanded
+    "32": -2,                 // multi-byte, signed by its declared type
+    "33": [10, 11, 12],       // multi-byte, a batch of readings
+    "34": "07e80c0c0e1e"      // multi-byte, a width this cannot decode
   }
 }
 ```
@@ -51,12 +54,32 @@ tables, which are not in this repository — see
 Reports keep going out on schedule either way: going silent would leave a
 consumer unable to tell a detached appliance from a dead bridge.
 
-**Values are unsigned decimal today**, because every service that can currently
-be polled uses the general format, which carries no data type — so nothing on
-the wire says whether a value is signed. The decoder can sign-extend and is
-tested doing so; there is simply nothing yet that tells it to. When multi-byte
-polling arrives, its type codes will, and a value may then also be an array or
-a string. Consumers should tolerate that widening.
+**A value has four shapes, and which one you get depends on the appliance's
+record format.** Consumers have to tolerate all four.
+
+| shape | when | example |
+|---|---|---|
+| unsigned number | general format, always | `62` |
+| number | multi-byte, one item of a width this can decode | `-2`, `1234` |
+| array of numbers | multi-byte, several items | `[10, 11, 12]` |
+| hex string | multi-byte, a width this cannot decode | `"07e80c0c0e1e"` |
+
+A general-format record carries **no data type**, so nothing on the wire says
+whether its value is signed and it goes out unsigned. The decoder can
+sign-extend and is tested doing so; in that format there is simply nothing to
+tell it to.
+
+A multi-byte record does carry a type, and it is published with the
+capabilities rather than repeated on every reading -- so a consumer that needs
+to know whether `3` is a count or a bit mask looks it up in section 4. One,
+two, four and eight-byte integers become JSON numbers, signed when the type
+says so. Everything else -- a six-byte timestamp, a composite -- goes out as
+lowercase hex of the bytes as they arrived, because a guess at its meaning
+would be worse than an honest dump.
+
+A multi-byte read asks the appliance for what it has rather than for a fixed
+number of items, so a meter answering with a batch of samples is normal and not
+an edge case. That is the array shape.
 
 ## 4. Capabilities
 
@@ -156,7 +179,8 @@ adds a **sibling** object, leaving `attributes` unchanged in shape:
 "attribute_bits":  { "21": [1,0,1,1,0,1,0,0, 0,0,0,0,0,0,0,0] }
 ```
 
-Default off.
+Default off. **Not implemented yet**: the setting is accepted and validated,
+and nothing reads it. Turning it on changes nothing about what is published.
 
 ## 6. Control and acknowledgement
 

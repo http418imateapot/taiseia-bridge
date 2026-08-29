@@ -139,7 +139,8 @@ processes.
 ## 7. Where things are
 
 ```
-src/core/taiseia/   framing, checksums, data types, registration, limits
+src/core/taiseia/   framing, checksums, data types, registration,
+                    reassembly of fragmented replies, limits
 src/core/model/     appliance state, capability cache, sweep scheduling, writes
 src/core/mqtt/      MQTT 3.1.1 codec and client, topics, payloads, configuration
 src/core/util/      result type, bounded string builder, JSON reader and writer
@@ -159,18 +160,19 @@ cmake/              the freestanding check
 Nothing structural. What remains is either a protocol gap that is detected and
 refused rather than half-handled, or a verification gap:
 
-- **The multi-byte request layout.** Those appliances are identified and then
-  left alone, in a state of their own, so an empty attribute set is never
-  mistaken for a device with nothing to report.
-- **Fragmented registration replies.** Detected and refused; reassembly is not
-  implemented.
 - **TLS.** Refused at startup rather than downgraded — see
   [adr/0008](adr/0008-no-tls.md).
-- **No physical appliance, no real broker, and no real serial port** has ever
-  been connected to any of this. See [testing.md](testing.md).
+- **`expand_bitfields`.** The setting is parsed and validated; nothing reads
+  it.
+- **No physical appliance** has ever been connected to any of this, and the
+  **Windows serial adapter** has never carried a byte in CI — there is no
+  virtual COM pair a hosted runner can create. See [testing.md](testing.md).
 
-Two protocol gaps are detected and refused rather than half-handled: the
-multi-byte request layout (so those appliances are identified but not polled)
-and fragmented registration replies.
+Both request layouts are implemented, both are polled, and a reply that arrives
+in fragments is rejoined before anything above the transport sees it. What the
+standard leaves open about a *registration* continuation is recorded as an
+inference in `src/core/taiseia/reassembly.h` and in
+[adr/0012](adr/0012-fragment-reassembly.md), and only a real appliance can
+settle it.
 
 See [testing.md](testing.md) for what "tested" means here, and what it does not.

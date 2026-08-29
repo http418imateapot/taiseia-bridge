@@ -527,7 +527,7 @@ static size_t mb_reply(uint8_t *out, uint16_t fragment, uint8_t sa,
     size_t len = TS_MB_OVERHEAD + count;
     size_t i;
 
-    out[0] = (uint8_t)(len - 1u);
+    out[0] = (uint8_t)len;
     out[1] = sa;
     out[2] = service;
     out[3] = TS_MB_RESERVED;
@@ -697,7 +697,7 @@ static void a_fragmented_registration_reply_is_joined(void)
     pkt[pos++] = 0x00; pkt[pos++] = 0x04;
     pkt[pos++] = 0xA1; pkt[pos++] = 0xA2;
     len = pos + 1u;
-    pkt[0] = (uint8_t)(len - 1u);
+    pkt[0] = (uint8_t)len;
     pkt[1] = 0x00;
     pkt[len - 1u] = ts_checksum(pkt, len - 1u);
     feed(&f, pkt, len);
@@ -709,7 +709,7 @@ static void a_fragmented_registration_reply_is_joined(void)
     pkt[pos++] = 0x00; pkt[pos++] = 0x04;
     pkt[pos++] = 0xB1;
     len = pos + 1u;
-    pkt[0] = (uint8_t)(len - 1u);
+    pkt[0] = (uint8_t)len;
     pkt[1] = 0x00;
     pkt[len - 1u] = ts_checksum(pkt, len - 1u);
     feed(&f, pkt, len);

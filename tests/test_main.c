@@ -25,6 +25,7 @@ int main(void)
     test_uart();
     test_platform();
     test_serial_pty();
+    test_serial_win32();
 
     printf("%d checks, %d failures\n", g_checks, g_failures);
 

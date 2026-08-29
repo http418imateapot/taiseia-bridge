@@ -22,7 +22,7 @@ static size_t mb_fragment(uint8_t *out, uint16_t fragment, uint8_t service,
     size_t len = TS_MB_OVERHEAD + count;
     size_t i;
 
-    out[0] = (uint8_t)(len - 1u);
+    out[0] = (uint8_t)len;
     out[1] = 0xE0;
     out[2] = service;
     out[3] = TS_MB_RESERVED;
@@ -50,7 +50,7 @@ static size_t reg_fragment(uint8_t *out, uint16_t fragment, uint8_t fill,
     size_t len = TS_REG_FRAME_OVERHEAD + TS_REG_HEADER_LEN + n;
     size_t i;
 
-    out[0] = (uint8_t)(len - 1u);
+    out[0] = (uint8_t)len;
     out[1] = (uint8_t)TS_SA_ID_REGISTRATION;
     out[2] = 0x01;                                  /* general format       */
     out[3] = 0x01;
@@ -260,10 +260,12 @@ static void a_fragmented_registration_decodes_as_one(void)
     pkt[pos++] = (uint8_t)((1u << 4) | 0x04u);
     pkt[pos++] = 0x00;
     pkt[pos++] = 0x04;                  /* SA id 4 */
-    memcpy(&pkt[pos], "ACME DH", 7);
-    pos += 7;
+    pkt[pos++] = (uint8_t)'A'; pkt[pos++] = (uint8_t)'C';
+    pkt[pos++] = (uint8_t)'M'; pkt[pos++] = (uint8_t)'E';
+    pkt[pos++] = 0u;                    /* end of make */
+    pkt[pos++] = (uint8_t)'D'; pkt[pos++] = (uint8_t)'H';
     len = pos + 1u;
-    pkt[0] = (uint8_t)(len - 1u);
+    pkt[0] = (uint8_t)len;
     pkt[1] = (uint8_t)TS_SA_ID_REGISTRATION;
     pkt[len - 1u] = ts_checksum(pkt, len - 1u);
     CHECK_EQ(ts_reasm_add(&r, pkt, len), RES_EAGAIN);
@@ -276,8 +278,9 @@ static void a_fragmented_registration_decodes_as_one(void)
     pkt[pos++] = 0x04;                  /* fragment 0 */
     pkt[pos++] = 0x00;
     pkt[pos++] = 0x04;
-    memcpy(&pkt[pos], "-200 ", 5);
-    pos += 5;
+    pkt[pos++] = (uint8_t)'-'; pkt[pos++] = (uint8_t)'2';
+    pkt[pos++] = (uint8_t)'0'; pkt[pos++] = (uint8_t)'0';
+    pkt[pos++] = 0u;                    /* end of model */
     pkt[pos++] = 0x80 | 0x03;           /* service 3, writable */
     pkt[pos++] = 0x00;
     pkt[pos++] = 0x64;
@@ -285,7 +288,7 @@ static void a_fragmented_registration_decodes_as_one(void)
     pkt[pos++] = 0x00;
     pkt[pos++] = 0x64;
     len = pos + 1u;
-    pkt[0] = (uint8_t)(len - 1u);
+    pkt[0] = (uint8_t)len;
     pkt[1] = (uint8_t)TS_SA_ID_REGISTRATION;
     pkt[len - 1u] = ts_checksum(pkt, len - 1u);
     CHECK_EQ(ts_reasm_add(&r, pkt, len), RES_OK);
@@ -320,7 +323,7 @@ static void a_headerless_continuation_is_refused(void)
 
     /* Five payload bytes: byte 5 still lands where the fragment number is
      * read, and still says zero, but there is no whole header to skip. */
-    pkt[0] = 7;
+    pkt[0] = 8;
     pkt[1] = (uint8_t)TS_SA_ID_REGISTRATION;
     pkt[2] = 0x01;
     pkt[3] = 0x01;
@@ -339,7 +342,7 @@ static void a_general_reply_passes_straight_through(void)
     ts_reasm_t r;
     uint8_t    pkt[8];
 
-    pkt[0] = 5;
+    pkt[0] = 6;
     pkt[1] = 0xE0;
     pkt[2] = 0x20;
     pkt[3] = 0x01;
