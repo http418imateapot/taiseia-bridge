@@ -423,6 +423,7 @@ result_t mqttc_publish(mqtt_client_t *c, const char *topic,
                        const void *payload, size_t len, bool retain)
 {
     size_t   n = 0;
+    size_t   need;
     result_t r;
 
     if (!c || !topic)
@@ -430,10 +431,28 @@ result_t mqttc_publish(mqtt_client_t *c, const char *topic,
     if (c->state != MQTTC_READY)
         return RES_EIO;
 
-    /* One packet in flight at a time. Growing a queue here would hide a
-     * broker that has stopped reading, until memory ran out. */
-    if (tx_room(c) < MQTT_PACKET_MAX)
-        return RES_EBUSY;
+    /* Past the declared ceiling it will never be publishable, and telling the
+     * caller to try again later would have it try forever. */
+    if (len > MQTT_PAYLOAD_MAX)
+        return RES_ETOOBIG;
+
+    /*
+     * Room for THIS packet, not for the largest one imaginable.
+     *
+     * Reserving the worst case meant a small publish was refused whenever
+     * anything at all was still queued, so two of them in one pass could never
+     * both be accepted -- which is exactly what a bridge does when it reports
+     * telemetry and capabilities together. The buffer still holds a bounded
+     * amount, so a broker that has stopped reading is still refused rather
+     * than queued against indefinitely.
+     */
+    need = 1u + 4u + 2u + strlen(topic) + len;
+
+    if (tx_room(c) < need) {
+        /* A packet that would not fit even in an empty buffer never will;
+         * anything else is worth trying again once this one has drained. */
+        return (need > sizeof(c->tx)) ? RES_ETOOBIG : RES_EBUSY;
+    }
 
     r = mqtt_encode_publish(c->tx + c->tx_len, sizeof(c->tx) - c->tx_len, &n,
                             topic, payload, len, retain);

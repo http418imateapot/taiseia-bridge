@@ -59,7 +59,7 @@ typedef struct {
     control_cmd_t     reject;
 
     int64_t           next_report_ms;
-    bool              was_online;
+    bool              status_known;   /* what the broker has actually been told */
     bool              status_sent;
     unsigned          last_sweeps;
 
@@ -196,7 +196,8 @@ static result_t start_uart(bridge_t *b)
 
 /* ------------------------------------------------------------- publication */
 
-static void emit(bridge_t *b, cfg_topic_t which, bool retain)
+/* True when the payload actually went somewhere. */
+static bool emit(bridge_t *b, cfg_topic_t which, bool retain)
 {
     result_t r;
 
@@ -204,23 +205,28 @@ static void emit(bridge_t *b, cfg_topic_t which, bool retain)
         /* No broker configured: the payloads go to the log, which is what
          * makes a simulator run worth watching. */
         LOG_I("%s %s", b->topic[which], sb_str(&b->sb));
-        return;
+        return true;
     }
 
     if (!mqttc_ready(&b->mqtt)) {
         /* Not connected is the normal state during an outage, and saying so
          * once per report at warning level would bury everything else. */
         LOG_D("%s dropped: not connected", b->topic[which]);
-        return;
+        return false;
     }
 
     r = mqttc_publish(&b->mqtt, b->topic[which], sb_str(&b->sb),
                       sb_len(&b->sb), retain);
+    if (r == RES_OK)
+        return true;
+
     if (r == RES_EBUSY)
         LOG_W("%s dropped: the send buffer is still draining",
               b->topic[which]);
-    else if (r != RES_OK)
+    else
         LOG_W("%s not published: %s", b->topic[which], res_str(r));
+
+    return false;
 }
 
 static bool stamp_now(char *out, size_t cap)
@@ -228,7 +234,8 @@ static bool stamp_now(char *out, size_t cap)
     return platform_iso8601_utc(out, cap);
 }
 
-static void publish_status(bridge_t *b, bool online)
+/* True when the status actually reached the broker. */
+static bool publish_status(bridge_t *b, bool online)
 {
     char stamp[PLATFORM_TIMESTAMP_MAX];
 
@@ -236,8 +243,10 @@ static void publish_status(bridge_t *b, bool online)
         stamp[0] = '\0';
 
     if (payload_status(&b->sb, b->cfg.device_id,
-                       stamp[0] ? stamp : NULL, online) == RES_OK)
-        emit(b, CFG_TOPIC_STATUS, b->cfg.retain_status);
+                       stamp[0] ? stamp : NULL, online) != RES_OK)
+        return false;
+
+    return emit(b, CFG_TOPIC_STATUS, b->cfg.retain_status);
 }
 
 static void publish_reports(bridge_t *b)
@@ -509,7 +518,7 @@ int main(int argc, char *argv[])
 
     started            = platform_now_ms();
     b->next_report_ms  = started;
-    b->was_online      = false;
+    b->status_known    = false;
 
     while (!platform_stop_requested()) {
         int64_t now = platform_now_ms();
@@ -524,10 +533,17 @@ int main(int argc, char *argv[])
         {
             bool online = appl_online(&b->appl);
 
-            if (online != b->was_online || !b->status_sent) {
-                publish_status(b, online);
-                b->was_online  = online;
-                b->status_sent = true;
+            /*
+             * Retry until it actually goes out. The first transitions happen
+             * while the broker connection is still being made, and a status
+             * that is only published on change is a status nobody ever hears
+             * if the one publish that would have carried it was dropped.
+             */
+            if (!b->status_sent || online != b->status_known) {
+                if (publish_status(b, online)) {
+                    b->status_known = online;
+                    b->status_sent  = true;
+                }
             }
         }
 
@@ -557,7 +573,7 @@ int main(int argc, char *argv[])
 
     /* A last word on the status topic, so a consumer is not left to infer our
      * absence from the will. */
-    publish_status(b, false);
+    (void)publish_status(b, false);
     if (config_mqtt_enabled(&b->cfg)) {
         (void)mqttc_tick(&b->mqtt, &b->sock, platform_now_ms());
         sock_close(&b->sock);

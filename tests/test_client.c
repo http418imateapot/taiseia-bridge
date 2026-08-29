@@ -502,6 +502,32 @@ static void publishing_needs_a_ready_client(void)
 }
 
 /*
+ * Two small publishes in one pass must both be accepted. Reserving the largest
+ * imaginable packet for each one meant a bridge could never report telemetry
+ * and capabilities together -- the second was refused every single time, and
+ * only a real broker showed it.
+ */
+static void two_small_publishes_in_one_pass_both_fit(void)
+{
+    mqtt_client_t c;
+    fake_sock_t   f;
+    socket_t      s;
+    size_t        before;
+
+    bring_up(&c, &f, &s);
+    before = f.out_len;
+
+    CHECK_EQ(mqttc_publish(&c, "v1/from/device/D/telemetry", "{\"a\":1}", 7,
+                           false), RES_OK);
+    CHECK_EQ(mqttc_publish(&c, "v1/from/device/D/capabilities", "{\"b\":2}", 7,
+                           true), RES_OK);
+
+    CHECK_EQ(mqttc_tick(&c, &s, 0), RES_OK);
+    CHECK(f.out_len > before + 60);
+    CHECK_EQ(mqttc_state(&c), MQTTC_READY);
+}
+
+/*
  * Growing a queue here would hide a broker that has stopped reading, until
  * memory ran out. Refusing lets the caller decide.
  */
@@ -510,14 +536,22 @@ static void a_busy_send_buffer_refuses_rather_than_grows(void)
     mqtt_client_t c;
     fake_sock_t   f;
     socket_t      s;
-    static uint8_t big[MQTT_PAYLOAD_MAX];
+    static uint8_t big[MQTT_PAYLOAD_MAX + 8u];
 
     bring_up(&c, &f, &s);
     f.send_limit = 1;                    /* nothing will drain this tick */
 
     memset(big, 'x', sizeof(big));
-    CHECK_EQ(mqttc_publish(&c, "a/b", big, sizeof(big), false), RES_OK);
-    CHECK_EQ(mqttc_publish(&c, "a/b", "second", 6, false), RES_EBUSY);
+    CHECK_EQ(mqttc_publish(&c, "a/b", big, MQTT_PAYLOAD_MAX, false), RES_OK);
+    CHECK_EQ(mqttc_publish(&c, "a/b", big, MQTT_PAYLOAD_MAX, false),
+             RES_EBUSY);
+
+    /*
+     * Past the ceiling is a different answer from busy: it will never be
+     * publishable, and "try again later" would have the caller try forever.
+     */
+    CHECK_EQ(mqttc_publish(&c, "a/b", big, MQTT_PAYLOAD_MAX + 1u, false),
+             RES_ETOOBIG);
 }
 
 static void a_peer_that_vanishes_takes_the_client_down(void)
@@ -596,6 +630,7 @@ void test_client(void)
     packet_boundaries_do_not_follow_read_boundaries();
     a_partial_send_is_resumed();
     publishing_needs_a_ready_client();
+    two_small_publishes_in_one_pass_both_fit();
     a_busy_send_buffer_refuses_rather_than_grows();
     a_peer_that_vanishes_takes_the_client_down();
     a_packet_out_of_sequence_takes_the_client_down();

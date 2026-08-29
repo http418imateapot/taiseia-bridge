@@ -33,6 +33,16 @@ jobs:
           ./build/taiseia-cli --link sim write 4 3 70
           ./build/taiseia-bridge --link sim -c examples/config/simulator.conf --run-for 3
 
+      # A fake socket agrees with whatever our client does, including whatever
+      # it does wrong. Mosquitto is an independent implementation and does not.
+      - name: install a broker
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mosquitto mosquitto-clients
+
+      - name: integration test against a real broker
+        run: |
+          sudo systemctl stop mosquitto 2>/dev/null || true
+          ./scripts/integration-broker.sh ./build/taiseia-bridge
+
   linux-release:
     name: linux / gcc / release, no sanitizers
     runs-on: ubuntu-latest

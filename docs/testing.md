@@ -6,7 +6,7 @@ Everything in `src/core` and `src/adapters/sim`, on every push, by CI:
 
 | Job | What it adds |
 |---|---|
-| linux / gcc / asan+ubsan | AddressSanitizer and UBSan, non-recovering; warnings are errors; the pseudo-terminal tests |
+| linux / gcc / asan+ubsan | AddressSanitizer and UBSan, non-recovering; warnings are errors; the pseudo-terminal tests; the broker integration test |
 | linux / gcc / release | optimised build, no sanitizers — different code, different bugs |
 | windows / msvc | a second compiler and a second standard library |
 
@@ -42,7 +42,7 @@ establishes that:
 - the **Windows** serial adapter works at all -- nothing in CI can open a
   serial port there, so it is exercised only through the port interface by a
   fake. The POSIX one is now driven through a real device (below);
-- the MQTT client can talk to a real broker;
+
 - the protocol has been read correctly at all.
 
 That last one deserves saying twice. The simulator is written from the same
@@ -51,6 +51,39 @@ misread identically in the other, and the tests pass. Building genuine packets
 on both sides narrows the gap — a framing error that only one side makes will
 show up — but agreement between two things derived from one reading is not
 evidence about the wire.
+
+## The broker integration test
+
+`scripts/integration-broker.sh` starts a real mosquitto, runs the bridge
+against it, and checks what the broker actually delivered.
+
+This is the part a fake socket cannot reach, and the reason is not subtle: a
+fake agrees with whatever the client does, *including whatever it does wrong*.
+Mosquitto does not. It will reject a malformed CONNECT, ignore a subscription
+it did not understand, and publish a last will exactly when the specification
+says to -- none of which our own tests could establish about our own client.
+
+Phase A is a clean run: connect, subscribe, report, take a command that is half
+accepted and half refused, watch the written value appear in the next report,
+and say goodbye on the way out. It also checks that a subscriber arriving after
+the device has gone still learns what it was, which is what retaining
+capabilities is for.
+
+Phase B kills the bridge with no chance to say anything, so whatever the broker
+publishes next is the will handed to it at CONNECT.
+
+**It found two defects on its first run**, both invisible to everything else:
+
+- **Capabilities were never published.** Not once, on any run. `mqttc_publish`
+  reserved room for the largest packet imaginable rather than the one it was
+  given, so the second of two publishes in one pass was refused every time --
+  and the bridge reports telemetry and capabilities together.
+- **The status transitions at startup were lost.** They happen while the broker
+  connection is still being made, and since status is only published on change,
+  nothing ever sent it again. The broker never saw the device come online.
+
+Both had passed every unit test, because the fake never had an opinion about
+what should have arrived.
 
 ## The pseudo-terminal tests
 
