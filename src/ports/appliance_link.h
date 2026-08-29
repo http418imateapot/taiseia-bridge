@@ -28,6 +28,15 @@ typedef enum {
     LINK_OP_REGISTER   /* SA id 0x00: ask the appliance to describe itself */
 } link_op_t;
 
+/*
+ * A request.
+ *
+ * **Zero the whole struct before filling it.** Fields are added here as the
+ * protocol is covered, and every one of them defaults to off -- but only if it
+ * was zeroed. A stale byte in `multibyte` turns an ordinary read into a
+ * malformed one, which the adapters refuse loudly rather than send, though
+ * that is a poor substitute for initialising it.
+ */
 typedef struct {
     uint32_t  id;          /* caller's correlation id, echoed in the reply  */
     link_op_t op;

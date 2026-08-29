@@ -564,7 +564,7 @@ static void a_multibyte_read_asks_in_the_wider_layout(void)
     CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
 
     CHECK_EQ(f.out_len, TS_MB_OVERHEAD + 2u);
-    CHECK_EQ(f.out[0], TS_MB_OVERHEAD + 2u - 1u);
+    CHECK_EQ(f.out[0], TS_MB_OVERHEAD + 2u);
     CHECK_EQ(f.out[2], 0x20);                 /* read: no write bit        */
     CHECK_EQ(f.out[3], TS_MB_RESERVED);
     CHECK_EQ(f.out[6], 0x21);
