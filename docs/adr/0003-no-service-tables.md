@@ -47,6 +47,16 @@ Consumers interpret meaning using their own licensed copy.
   Conflating the two produces a plausible, wrong reading.
 - Consumers need the standard to do anything semantic. This is a real cost and
   is stated in the README rather than hidden.
+- **A general-format appliance gives less than the above promises.** Its
+  capability records carry no type code at all — three bytes: the service byte
+  and two support bytes. Whether those two are a range, a maximum or a mask is
+  a fact about the service, held in the tables we do not ship. For these
+  appliances the published capability is the raw bytes and nothing more. This
+  was not obvious when the decision was taken. It is the decision working as
+  intended rather than an argument against it, but it is a sharper cost than
+  was first understood. An operator who holds the tables can recover the
+  richer form through a service-id-to-type map supplied as configuration —
+  the same boundary, with the licensed part on the operator's side of it.
 
 ## Alternatives rejected
 

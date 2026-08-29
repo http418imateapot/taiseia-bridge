@@ -95,11 +95,17 @@ out the bottom two rows permanently. See
 Published payloads carry TaiSEIA service identifiers and values as they arrive.
 Nothing here maps service 3 to a name or value 1 to `"on"`.
 
-The appliance reports its own capabilities at registration — for each service:
-the access direction, the data type code, and the supported range or bit mask.
-That is enough to describe a service's *shape* without knowing its *meaning*.
-Meaning lives in the per-appliance service tables, which are licensed material
-and are not in this repository; consumers apply their own copy.
+The appliance reports its own capabilities at registration: for each service,
+the access direction and its support data. That is usually enough to describe a
+service's *shape* without knowing its *meaning*. Meaning lives in the
+per-appliance service tables, which are licensed material and are not in this
+repository; consumers apply their own copy.
+
+There is one place this gets thinner than it sounds. An appliance using the
+general record format sends no data type code, so its two support bytes could
+be a range, a maximum or a bit mask and nothing on the wire says which. Those
+capabilities are published as raw bytes. See
+[mqtt-api.md](mqtt-api.md) §4.2 and [adr/0003](adr/0003-no-service-tables.md).
 
 The practical consequence is that a new appliance type needs no change here.
 
@@ -117,7 +123,7 @@ processes.
 ## 7. Where things are
 
 ```
-src/core/taiseia/   framing, checksums, data types, limits
+src/core/taiseia/   framing, checksums, data types, registration, limits
 src/core/util/      result type, and the small primitives built on it
 src/ports/          interfaces: appliance_link, serial
 src/adapters/sim/   a simulated appliance, including fault injection
@@ -129,8 +135,9 @@ cmake/              the freestanding check
 
 ## 8. What is not built yet
 
-Registration payload decoding, the capability model, MQTT, configuration, the
-serial adapters, and both applications. The southbound framing layer and the
-simulator are in place and tested; everything above them is not.
+The appliance model and poll scheduling, MQTT, configuration, the serial
+adapters, and both applications. The southbound protocol layer -- framing,
+data types, registration and capability decoding -- and the simulator are in
+place and tested; everything above them is not.
 
 See [testing.md](testing.md) for what "tested" means here, and what it does not.

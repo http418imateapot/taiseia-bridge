@@ -58,18 +58,22 @@ which is why it is called out here and tested explicitly.
 
 ## 4. Capabilities
 
+What can be published here depends on which of the two record formats the
+appliance uses, and the difference is larger than it looks. The appliance
+declares which at registration.
+
+### 4.1 Multi-byte format — the type code is on the wire
+
 ```jsonc
 {
-  "device_id": "...", "device_time": "...", "sa_id": 4, "online": true,
+  "device_id": "...", "device_time": "...", "sa_id": 224, "online": true,
+  "format": "multibyte",
   "capabilities": [
-    { "id": 0,  "access": "rw", "dtype": "ENUM16",
-      "support": { "kind": "bits",  "mask": 45, "width": 16 } },
+    { "id": 32, "access": "r",  "dtype": "UINT16",
+      "support": { "kind": "range", "min": 0, "max": 10000 } },
 
-    { "id": 3,  "access": "rw", "dtype": "UINT16",
-      "support": { "kind": "range", "min": 16, "max": 32 } },
-
-    { "id": 12, "access": "r",  "dtype": "Y-M-D-H-M-S",
-      "support": { "kind": "max",   "max": 0 } },
+    { "id": 33, "access": "rw", "dtype": "ENUM16_Bit",
+      "support": { "kind": "bits",  "mask": 3845, "width": 16 } },
 
     { "id": 9,  "access": "r",  "dtype": "Y-M-D-H-M-S+UINT32",
       "support": { "kind": "raw",   "hex": "07E80C0C0E1E0000000064" } }
@@ -77,17 +81,45 @@ which is why it is called out here and tested explicitly.
 }
 ```
 
-`support.kind` is one of four, mirroring the four shapes the standard defines
-for support data:
+`support.kind` mirrors the shapes the standard defines for support data:
 
 | kind | meaning |
 |---|---|
 | `range` | `min` and `max` are both meaningful |
 | `max` | `max` only; the minimum is fixed at zero |
 | `bits` | `mask` — one bit per supported item, `width` bits wide |
-| `raw` | a composite type, handed over as hex rather than guessed at |
+| `raw` | hex, when the shape cannot be resolved here |
 
-### 4.1 `bits` means two different things, and `dtype` is how you tell
+### 4.2 General format — there is no type code, and it cannot be invented
+
+```jsonc
+{
+  "device_id": "...", "device_time": "...", "sa_id": 4, "online": true,
+  "format": "general",
+  "capabilities": [
+    { "id": 0, "access": "rw", "support": { "kind": "raw", "hex": "0003" } },
+    { "id": 3, "access": "rw", "support": { "kind": "raw", "hex": "1020" } }
+  ]
+}
+```
+
+A general-format record is three bytes: the service byte and **two support
+bytes, with no type code**. Those two bytes may be a range, a maximum, or a bit
+mask — and nothing on the wire says which. That fact lives in the per-appliance
+service tables, which are licensed material and are not in this project.
+
+So for these appliances the bridge publishes the raw bytes and stops. It is a
+real reduction in what a consumer gets, and it follows directly from
+[adr/0003](adr/0003-no-service-tables.md): a consumer holding the tables loses
+nothing, and one without them was never going to be able to interpret a service
+identifier anyway.
+
+There is a clean way to recover the richer form for an operator who does hold
+the tables — a service-id-to-type map supplied as **configuration**, never
+compiled in. Not implemented; noted so that the shape of the answer is on
+record.
+
+### 4.3 `bits` means two different things, and `dtype` is how you tell
 
 For `ENUM16`, a set bit at position *i* means **the value *i* is allowed**.
 
@@ -95,7 +127,8 @@ For `ENUM16_Bit`, a set bit at position *i* means **bit *i* of the value is
 meaningful**.
 
 Both arrive as a mask and they are not interchangeable. This is why the type
-code is published with every capability rather than being resolved away.
+code is published with every capability rather than being resolved away — and
+why §4.2 cannot simply pick one of the two.
 
 ## 5. Bit fields are not expanded
 
