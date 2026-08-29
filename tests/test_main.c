@@ -19,6 +19,7 @@ int main(void)
     test_config();
     test_mqtt();
     test_client();
+    test_platform();
 
     printf("%d checks, %d failures\n", g_checks, g_failures);
 

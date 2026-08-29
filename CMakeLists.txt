@@ -83,6 +83,20 @@ add_library(tsb_sim STATIC
     src/adapters/sim/sim_link.c)
 target_link_libraries(tsb_sim PUBLIC tsb_core PRIVATE tsb_warnings)
 
+# The platform layer: one seam, two implementations, no #ifdef above it.
+if(WIN32)
+    add_library(tsb_platform STATIC
+        src/adapters/platform_log.c
+        src/adapters/win32/platform_win32.c)
+    target_link_libraries(tsb_platform PUBLIC tsb_core ws2_32)
+else()
+    add_library(tsb_platform STATIC
+        src/adapters/platform_log.c
+        src/adapters/posix/platform_posix.c)
+    target_link_libraries(tsb_platform PUBLIC tsb_core)
+endif()
+target_link_libraries(tsb_platform PRIVATE tsb_warnings)
+
 # --------------------------------------------------------------------- tests
 if(TSB_BUILD_TESTS)
     enable_testing()
@@ -98,9 +112,10 @@ if(TSB_BUILD_TESTS)
         tests/test_payload.c
         tests/test_config.c
         tests/test_mqtt.c
-        tests/test_client.c)
+        tests/test_client.c
+        tests/test_platform.c)
     target_include_directories(tsb_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    target_link_libraries(tsb_tests PRIVATE tsb_sim tsb_warnings)
+    target_link_libraries(tsb_tests PRIVATE tsb_sim tsb_platform tsb_warnings)
 
     add_test(NAME unit COMMAND tsb_tests)
 
