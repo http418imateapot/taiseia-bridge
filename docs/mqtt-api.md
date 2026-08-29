@@ -1,8 +1,8 @@
 # MQTT API
 
-> Topic rendering, payload construction and the MQTT codec are built and
-> tested. The client that opens a socket and drives them is not. See
-> [architecture.md §8](architecture.md).
+> Everything on this page is built, and exercised against a real mosquitto by
+> `scripts/integration-broker.sh`. What has *not* been exercised is a real
+> appliance behind it -- see [testing.md](testing.md).
 
 ## 1. Topics
 
@@ -11,14 +11,26 @@ defaults:
 
 | Purpose | Default template | Direction |
 |---|---|---|
-| `topic_telemetry` | `{prefix}/from/device/{id}/telemetry` | published |
-| `topic_capabilities` | `{prefix}/from/device/{id}/capabilities` | published, retained |
-| `topic_status` | `{prefix}/from/device/{id}/status` | published, retained, also the will |
-| `topic_control` | `{prefix}/to/device/{id}/control` | subscribed |
-| `topic_ack` | `{prefix}/from/device/{id}/control/acknowledgement` | published |
+| `topic_telemetry` | `{prefix}/from/appliance/{id}/telemetry` | published |
+| `topic_capabilities` | `{prefix}/from/appliance/{id}/capabilities` | published, retained |
+| `topic_status` | `{prefix}/from/appliance/{id}/status` | published, retained, also the will |
+| `topic_command` | `{prefix}/to/appliance/{id}/command` | subscribed |
+| `topic_ack` | `{prefix}/from/appliance/{id}/command/ack` | published |
+
+`topic_prefix` defaults to **`taiseia101/v1`**. The version sits *under* the
+protocol name because what it versions is this bridge's payload schema, not a
+system-wide contract -- see [adr/0007](adr/0007-topic-templates.md).
+
+`from` and `to` are written from the consumer's side: `to` is what you send.
+The whole `from/appliance/{id}` subtree means *about* appliance `{id}`, not
+*spoken by* it -- the acknowledgement is the bridge's verdict, and two of its
+outcomes (`read_only`, `unknown`) are settled without touching the wire at all.
 
 All five are rendered and checked at startup: each must fit, and no two may be
-equal. See [adr/0007](adr/0007-topic-templates.md).
+equal. A rendered topic has 160 bytes; with the defaults that leaves 119 for
+the device identifier, which is far more than the 23 an MQTT client identifier
+is guaranteed to be allowed. Too long is reported as such, and says which of
+the two to shorten.
 
 Capabilities and status are retained because a subscriber that joins late needs
 them to interpret anything else. Telemetry is not: a retained sample is a stale
@@ -185,7 +197,7 @@ and nothing reads it. Turning it on changes nothing about what is published.
 ## 6. Control and acknowledgement
 
 ```jsonc
-// inbound on topic_control
+// inbound on topic_command
 { "tag": 1, "attributes": { "3": 70 } }
 ```
 

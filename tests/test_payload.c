@@ -17,9 +17,9 @@ static void templates_substitute_both_placeholders(void)
     char out[TOPIC_MAX];
 
     CHECK_EQ(topic_render(out, sizeof(out),
-                          "{prefix}/from/device/{id}/telemetry",
-                          "v1", "TS-1"), RES_OK);
-    CHECK_STREQ(out, "v1/from/device/TS-1/telemetry");
+                          "{prefix}/from/appliance/{id}/telemetry",
+                          "taiseia101/v1", "TS-1"), RES_OK);
+    CHECK_STREQ(out, "taiseia101/v1/from/appliance/TS-1/telemetry");
 
     /* A template need not use either. */
     CHECK_EQ(topic_render(out, sizeof(out), "fixed/topic", "v1", "TS-1"),
@@ -46,7 +46,7 @@ static void an_unknown_placeholder_is_refused(void)
     CHECK_EQ(topic_render(out, sizeof(out), "{}", "v1", "A"), RES_EFORMAT);
     CHECK_EQ(topic_render(out, sizeof(out), "", "v1", "A"), RES_EFORMAT);
 
-    CHECK_EQ(topic_render(out, 8, "{prefix}/from/device/{id}/telemetry",
+    CHECK_EQ(topic_render(out, 8, "{prefix}/from/appliance/{id}/telemetry",
                           "v1", "TS-1"), RES_ETOOBIG);
 
     CHECK_EQ(topic_render(NULL, 8, "x", "v1", "A"), RES_EINVAL);

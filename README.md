@@ -93,10 +93,10 @@ the whole path is visible:
 
 ```
 info  taiseia-bridge 0.1.0-dev starting as SIM-0001
-info  v1/from/device/SIM-0001/status {"device_id":"SIM-0001",...,"online":true}
-info  v1/from/device/SIM-0001/telemetry {...,"sa_id":4,"online":true,
+info  taiseia101/v1/from/appliance/SIM-0001/status {"device_id":"SIM-0001",...}
+info  taiseia101/v1/from/appliance/SIM-0001/telemetry {...,"sa_id":4,"online":true,
       "attributes":{"0":1,"3":55,"7":62}}
-info  v1/from/device/SIM-0001/capabilities {...,"format":"general",
+info  taiseia101/v1/from/appliance/SIM-0001/capabilities {...,"format":"general",
       "make":"SIMULATOR","model":"SIM-0001","capabilities":[...]}
 ```
 

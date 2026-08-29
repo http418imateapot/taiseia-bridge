@@ -27,14 +27,19 @@
 
 #define CFG_STR_MAX     128u
 #define CFG_PATH_MAX    256u
-#define CFG_PREFIX_MAX   32u
+/*
+ * The prefix is where a deployment scopes itself -- a site, a tenant, a
+ * protocol name and a schema version. Thirty-two bytes ran out before the
+ * scoping did: "taiseia101/v1" alone is thirteen of them.
+ */
+#define CFG_PREFIX_MAX   64u
 #define CFG_LINE_MAX    512u
 
 typedef enum {
     CFG_TOPIC_TELEMETRY = 0,
     CFG_TOPIC_CAPABILITIES,
     CFG_TOPIC_STATUS,
-    CFG_TOPIC_CONTROL,
+    CFG_TOPIC_COMMAND,
     CFG_TOPIC_ACK,
     CFG_TOPIC_COUNT
 } cfg_topic_t;

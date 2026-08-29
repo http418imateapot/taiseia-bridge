@@ -12,16 +12,16 @@ static const char *const k_topic_names[CFG_TOPIC_COUNT] = {
     "topic_telemetry",
     "topic_capabilities",
     "topic_status",
-    "topic_control",
+    "topic_command",
     "topic_ack"
 };
 
 static const char *const k_topic_defaults[CFG_TOPIC_COUNT] = {
-    "{prefix}/from/device/{id}/telemetry",
-    "{prefix}/from/device/{id}/capabilities",
-    "{prefix}/from/device/{id}/status",
-    "{prefix}/to/device/{id}/control",
-    "{prefix}/from/device/{id}/control/acknowledgement"
+    "{prefix}/from/appliance/{id}/telemetry",
+    "{prefix}/from/appliance/{id}/capabilities",
+    "{prefix}/from/appliance/{id}/status",
+    "{prefix}/to/appliance/{id}/command",
+    "{prefix}/from/appliance/{id}/command/ack"
 };
 
 const char *config_topic_name(cfg_topic_t t)
@@ -70,7 +70,7 @@ void config_defaults(config_t *c)
     c->mqtt_keepalive_s = 60;
     c->tls_enable       = false;
 
-    (void)set_str(c->topic_prefix, sizeof(c->topic_prefix), "v1");
+    (void)set_str(c->topic_prefix, sizeof(c->topic_prefix), "taiseia101/v1");
     for (i = 0; i < CFG_TOPIC_COUNT; i++)
         (void)set_str(c->topic[i], TOPIC_TEMPLATE_MAX, k_topic_defaults[i]);
 
@@ -398,8 +398,15 @@ result_t config_validate(const config_t *c, const char *device_id,
                 (cfg_topic_t)which), NULL);
         return RES_EINVAL;
     }
+    if (r == RES_ETOOBIG) {
+        /* Naming the cure matters: the template is usually fine and the
+         * device id is usually what has to give. */
+        say(err, errcap, "topic too long, shorten the device id or prefix: ",
+            config_topic_name((cfg_topic_t)which), NULL);
+        return r;
+    }
     if (r != RES_OK) {
-        say(err, errcap, "unusable topic: ", config_topic_name(
+        say(err, errcap, "unusable topic template: ", config_topic_name(
                 (cfg_topic_t)which), NULL);
         return r;
     }

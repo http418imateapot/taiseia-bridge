@@ -227,7 +227,7 @@ static void a_published_message_round_trips(void)
     size_t        payload_len = 0;
 
     CHECK_EQ(mqtt_encode_publish(buf, sizeof(buf), &len,
-                                 "v1/to/device/TS-1/control",
+                                 "taiseia101/v1/to/appliance/TS-1/command",
                                  "{\"tag\":1}", 9, false), RES_OK);
     CHECK_EQ(mqtt_packet_len(buf, len, &need), RES_OK);
     CHECK_EQ(need, len);
@@ -238,8 +238,8 @@ static void a_published_message_round_trips(void)
 
     CHECK_EQ(mqtt_publish_parts(&p, &topic, &topic_len, &payload,
                                 &payload_len), RES_OK);
-    CHECK_EQ(topic_len, 25);
-    CHECK(memcmp(topic, "v1/to/device/TS-1/control", 25) == 0);
+    CHECK_EQ(topic_len, 39);
+    CHECK(memcmp(topic, "taiseia101/v1/to/appliance/TS-1/command", 39) == 0);
     CHECK_EQ(payload_len, 9);
     CHECK(memcmp(payload, "{\"tag\":1}", 9) == 0);
 }

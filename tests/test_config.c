@@ -31,10 +31,10 @@ static void the_default_is_a_disabled_service(void)
     CHECK_EQ(c.tls_enable, 0);
     CHECK_EQ(c.serial_baud, 9600);
     CHECK_EQ(c.report_interval_s, 60);
-    CHECK_STREQ(c.topic_prefix, "v1");
+    CHECK_STREQ(c.topic_prefix, "taiseia101/v1");
     CHECK_STREQ(c.log_level, "info");
     CHECK_STREQ(c.topic[CFG_TOPIC_TELEMETRY],
-                "{prefix}/from/device/{id}/telemetry");
+                "{prefix}/from/appliance/{id}/telemetry");
 
     /* Late subscribers need these to interpret anything else; a retained
      * telemetry sample would just be a stale one. */
@@ -180,7 +180,8 @@ static void validation_runs_before_anything_starts(void)
 
     /* Two topics rendering the same string is a configuration mistake that
      * looks like data corruption downstream. */
-    apply(&c, "topic_status = {prefix}/from/device/{id}/telemetry", RES_OK);
+    apply(&c, "topic_status = {prefix}/from/appliance/{id}/telemetry",
+          RES_OK);
     err[0] = '\0';
     CHECK_EQ(config_validate(&c, "TS-1", err, sizeof(err)), RES_EINVAL);
     CHECK(err[0] != '\0');
@@ -190,9 +191,36 @@ static void validation_runs_before_anything_starts(void)
     apply(&c, "mqtt_host = broker", RES_OK);
     apply(&c, "topic_telemetry = {id}/{id}/{id}/{id}/{id}", RES_OK);
     CHECK_EQ(config_validate(&c, "TS-1", err, sizeof(err)), RES_OK);
+    err[0] = '\0';
     CHECK_EQ(config_validate(&c,
                              "0123456789012345678901234567890123456789",
                              err, sizeof(err)), RES_ETOOBIG);
+    /*
+     * Too long and malformed have different cures, so they must not share a
+     * message. An operator told only "unusable" has nothing to act on.
+     */
+    CHECK(strstr(err, "too long") != NULL);
+    CHECK(strstr(err, "device id") != NULL);
+
+    config_defaults(&c);
+    apply(&c, "mqtt_host = broker", RES_OK);
+    apply(&c, "topic_telemetry = {prefix}/{nope}/x", RES_OK);
+    err[0] = '\0';
+    CHECK_EQ(config_validate(&c, "TS-1", err, sizeof(err)), RES_EFORMAT);
+    CHECK(strstr(err, "too long") == NULL);
+    CHECK(strstr(err, "template") != NULL);
+
+    /*
+     * The prefix is where a deployment scopes itself -- a site, a tenant, the
+     * protocol name and the schema version. Thirty-two bytes ran out before
+     * the scoping did.
+     */
+    config_defaults(&c);
+    apply(&c, "mqtt_host = broker", RES_OK);
+    apply(&c, "topic_prefix = acme-corp/building-3/floor-2/taiseia101/v1",
+          RES_OK);
+    CHECK_STREQ(c.topic_prefix, "acme-corp/building-3/floor-2/taiseia101/v1");
+    CHECK_EQ(config_validate(&c, "TS-1", err, sizeof(err)), RES_OK);
 
     /*
      * A value longer than its field is refused outright. Truncating it would
@@ -205,7 +233,7 @@ static void validation_runs_before_anything_starts(void)
               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           RES_EFORMAT);
     CHECK_STREQ(c.topic[CFG_TOPIC_TELEMETRY],
-                "{prefix}/from/device/{id}/telemetry");
+                "{prefix}/from/appliance/{id}/telemetry");
     apply(&c, "mqtt_host = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

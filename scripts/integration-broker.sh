@@ -23,9 +23,9 @@ set -uo pipefail
 BIN="${1:-./build/taiseia-bridge}"
 PORT="${MQTT_PORT:-11883}"
 DEVICE="IT-0001"
-PREFIX="v1"
-FROM="${PREFIX}/from/device/${DEVICE}"
-TO="${PREFIX}/to/device/${DEVICE}"
+PREFIX="taiseia101/v1"
+FROM="${PREFIX}/from/appliance/${DEVICE}"
+TO="${PREFIX}/to/appliance/${DEVICE}"
 
 DIR="$(mktemp -d)"
 MOSQ_PID=""
@@ -152,21 +152,21 @@ expect "$DIR/rx.txt" "${FROM}/capabilities .*\"format\":\"general\"" \
                                                             "capabilities state the record format"
 
 # A control command, and the acknowledgement it is owed.
-mosquitto_pub -h 127.0.0.1 -p "$PORT" -t "${TO}/control" \
+mosquitto_pub -h 127.0.0.1 -p "$PORT" -t "${TO}/command" \
     -m '{"tag":"t1","attributes":{"3":70,"7":1}}'
 
-if ! wait_for "$DIR/rx.txt" "control/acknowledgement" 15; then
+if ! wait_for "$DIR/rx.txt" "command/ack" 15; then
     fail "no acknowledgement arrived"
 else
-    expect "$DIR/rx.txt" "acknowledgement .*\"tag\":\"t1\"" \
+    expect "$DIR/rx.txt" "command/ack .*\"tag\":\"t1\"" \
            "the tag comes back byte for byte"
-    expect "$DIR/rx.txt" "acknowledgement .*\"3\":\"ok\"" \
+    expect "$DIR/rx.txt" "command/ack .*\"3\":\"ok\"" \
            "the writable service was written"
     # Service 7 is declared read-only, and that is settled from the capability
     # set without an exchange.
-    expect "$DIR/rx.txt" "acknowledgement .*\"7\":\"read_only\"" \
+    expect "$DIR/rx.txt" "command/ack .*\"7\":\"read_only\"" \
            "the read-only service was refused by name"
-    expect "$DIR/rx.txt" "acknowledgement .*\"success\":false" \
+    expect "$DIR/rx.txt" "command/ack .*\"success\":false" \
            "a partly refused command is not a success"
 fi
 
