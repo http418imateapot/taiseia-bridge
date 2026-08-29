@@ -36,6 +36,8 @@ typedef struct {
                              ignored in the general record format          */
     bool     writable;
     uint16_t value;
+    bool     clamps;      /* store clamp_to instead of what was written    */
+    uint16_t clamp_to;
     uint8_t  support[TS_SUPPORT_MAX_BYTES];
     size_t   support_len;
 } sim_service_t;
@@ -104,6 +106,14 @@ void sim_link_drop_next(sim_link_t *s, unsigned n);
 
 /** Damage the checksum of the next reply. */
 void sim_link_corrupt_next(sim_link_t *s);
+
+/**
+ * Make one service store `to` whatever is written to it, as an appliance that
+ * clamps a setting to its own limits would. The reply then echoes a value the
+ * requester did not send, which is the only signal the protocol gives that a
+ * write was not taken as asked.
+ */
+result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to);
 
 /** Take the link down, as a pulled cable would. */
 void sim_link_set_down(sim_link_t *s);

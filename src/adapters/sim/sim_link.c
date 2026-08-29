@@ -135,6 +135,23 @@ void sim_link_corrupt_next(sim_link_t *s)
         s->corrupt_next = true;
 }
 
+result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to)
+{
+    sim_service_t *svc;
+
+    if (!s)
+        return RES_EINVAL;
+
+    svc = find_service(s, (uint8_t)(service_id & TS_SVC_ID_MASK));
+    if (!svc)
+        return RES_ENOTFOUND;
+
+    svc->clamps   = true;
+    svc->clamp_to = to;
+
+    return RES_OK;
+}
+
 void sim_link_set_down(sim_link_t *s)
 {
     if (s)
@@ -367,7 +384,7 @@ static result_t sim_submit(void *self, const link_req_t *req)
             fail(s, req->id, RES_EUNSUPPORTED);
             return RES_OK;
         }
-        svc->value = req->value;
+        svc->value = svc->clamps ? svc->clamp_to : req->value;
     }
 
     return reply_service(s, req->id, in.service_id, in.write, svc->value);

@@ -13,6 +13,7 @@ int main(void)
     test_datatype();
     test_registration();
     test_sim_link();
+    test_appliance();
 
     printf("%d checks, %d failures\n", g_checks, g_failures);
 
