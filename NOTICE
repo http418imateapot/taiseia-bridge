@@ -1,0 +1,23 @@
+taiseia-bridge
+Copyright 2026 Calvin
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+---
+
+This product implements the appliance-side (HNA role) application protocol
+described by CNS 16014, a publicly available national standard of Taiwan.
+
+This repository contains no text, tables, or figures reproduced from CNS 16014
+or CNS 16090. In particular it deliberately contains no copy of the per-
+appliance service tables (CNS 16014 Annex A): appliance capabilities are
+queried from the appliance at run time instead. Interpreting the meaning of a
+service identifier is the consumer's responsibility, using its own licensed
+copy of the standard.
+
+This product is not certified, endorsed, or verified by any standards body,
+and no claim of conformance to CNS 16014 or CNS 16090 is made.
