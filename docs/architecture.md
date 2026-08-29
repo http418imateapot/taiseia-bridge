@@ -75,8 +75,15 @@ adapters/taiseia_uart ──▶ ports/serial.h ◀── adapters/{posix,win32}
 ## 4. Concurrency is not in the core
 
 `appliance_link` is asynchronous by contract: `submit` and `poll`, neither of
-which blocks. The core drives them from a loop that never blocks, and holds the
-timeout and retry policy itself.
+which blocks. The core drives them from a loop that never blocks.
+
+Deadlines are split, and the split is not arbitrary. The 200 ms response
+deadline is measured from the last byte of a request leaving the wire, which
+only an adapter can know — timing it from `submit()` would include queueing
+delay on a threaded adapter and measure the wrong thing. **Adapters enforce it
+and report a timeout; the core owns retries, re-registration, and when to call
+an appliance offline**, plus a far longer backstop so that an adapter which
+accepts a request and never answers cannot wedge the model.
 
 | Adapter | `submit` | `poll` |
 |---|---|---|
@@ -124,6 +131,7 @@ processes.
 
 ```
 src/core/taiseia/   framing, checksums, data types, registration, limits
+src/core/model/     appliance state, capability cache, sweep scheduling, writes
 src/core/util/      result type, and the small primitives built on it
 src/ports/          interfaces: appliance_link, serial
 src/adapters/sim/   a simulated appliance, including fault injection
@@ -135,9 +143,12 @@ cmake/              the freestanding check
 
 ## 8. What is not built yet
 
-The appliance model and poll scheduling, MQTT, configuration, the serial
-adapters, and both applications. The southbound protocol layer -- framing,
-data types, registration and capability decoding -- and the simulator are in
-place and tested; everything above them is not.
+MQTT, configuration, the serial adapters, and both applications. The southbound
+half -- framing, data types, registration, the appliance model and the
+simulator -- is in place and tested; the northbound half is not.
+
+Two protocol gaps are detected and refused rather than half-handled: the
+multi-byte request layout (so those appliances are identified but not polled)
+and fragmented registration replies.
 
 See [testing.md](testing.md) for what "tested" means here, and what it does not.

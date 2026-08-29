@@ -32,7 +32,7 @@ plus what the platform already provides.
 | Packet framing, checksums, data types | built, tested |
 | Appliance link port and simulator | built, tested |
 | Registration and capability decoding | built, tested |
-| Poll scheduling and the appliance model | not started |
+| Appliance model, sweep scheduling, writes | built, tested |
 | MQTT, configuration, the applications | not started |
 | Serial adapters (POSIX, Windows) | not started |
 

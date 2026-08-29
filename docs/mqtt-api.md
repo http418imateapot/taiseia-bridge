@@ -168,6 +168,25 @@ Default off.
 `tag` is echoed back byte for byte, whatever its JSON type, so a consumer may
 correlate however it likes.
 
+The numbers in `results` come from a **configurable mapping**, because the
+device protocol has no write result codes of its own -- success there is
+defined as the appliance replying with a packet identical to the request. The
+model reports what it observed; the mapping turns that into whatever a
+particular backend expects:
+
+| Model outcome | Meaning | Example mapping |
+|---|---|---|
+| `ok` | the reply matched the request byte for byte | `0` |
+| `not_taken` | the appliance replied with a different value | `240` |
+| `read_only` | declared read-only in the capability set | `255` |
+| `unknown` | not in the capability set at all | `255` |
+| `no_reply` | timed out or the transport failed | `255` |
+
+`not_taken` deliberately does not claim "out of range". A differing echo is
+equally consistent with the appliance rounding the value, refusing it, or being
+busy, and the protocol gives no way to tell. See
+[adr/0011](adr/0011-write-outcome-vocabulary.md).
+
 ## 7. Status and offline behaviour
 
 ```jsonc

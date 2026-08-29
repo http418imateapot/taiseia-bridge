@@ -47,9 +47,17 @@ concept. There is no thread port in `ports/`.
 
 - The core stays free of any concurrency primitive, so it compiles and tests
   identically on every target.
-- Timeout and retry policy (the standard's 200 ms response deadline, retry
-  limit of 3) lives in the core, where it is unit-testable, rather than being
+- Retry policy lives in the core, where it is unit-testable, rather than being
   reimplemented per adapter.
+- **The 200 ms deadline is the adapter's, not the core's.** This paragraph
+  originally claimed both, and implementing the model showed that to be wrong.
+  The deadline is measured from the last byte of the request leaving the wire,
+  which only an adapter can know; timing it from `submit()` would include
+  queueing delay on a threaded adapter and measure something else entirely. So
+  adapters enforce it and report `RES_ETIMEOUT`, and the core owns everything
+  above: how many times to retry, when to re-register, and when to declare the
+  appliance offline. The core also keeps a much longer backstop deadline, so
+  that an adapter which accepts a request and never answers cannot wedge it.
 - The cost is that request state must be explicit rather than living on a
   blocked call stack. This is the same shape the MQTT client already uses, so
   it is not a new idea in this codebase.
