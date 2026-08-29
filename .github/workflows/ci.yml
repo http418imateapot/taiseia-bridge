@@ -24,6 +24,15 @@ jobs:
       - name: test
         run: ctest --test-dir build --output-on-failure -V
 
+      # The unit tests prove the pieces; this proves they were wired together.
+      # Sanitizers are still on, so the whole run is checked for memory errors.
+      - name: smoke test the simulator
+        run: |
+          ./build/taiseia-cli --link sim identify
+          ./build/taiseia-cli --link sim read 4 7
+          ./build/taiseia-cli --link sim write 4 3 70
+          ./build/taiseia-bridge --link sim -c examples/config/simulator.conf --run-for 3
+
   linux-release:
     name: linux / gcc / release, no sanitizers
     runs-on: ubuntu-latest
@@ -39,6 +48,9 @@ jobs:
       - name: test
         run: ctest --test-dir build --output-on-failure
 
+      - name: smoke test the simulator
+        run: ./build/taiseia-bridge --link sim -c examples/config/simulator.conf --run-for 3
+
   windows:
     name: windows / msvc
     runs-on: windows-latest
@@ -53,3 +65,8 @@ jobs:
 
       - name: test
         run: ctest --test-dir build -C Debug --output-on-failure
+
+      - name: smoke test the simulator
+        run: |
+          .\build\Debug\taiseia-cli.exe --link sim identify
+          .\build\Debug\taiseia-bridge.exe --link sim -c examples/config/simulator.conf --run-for 3

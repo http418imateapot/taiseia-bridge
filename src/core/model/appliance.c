@@ -51,6 +51,11 @@ bool appl_online(const appliance_t *a)
     return a && (a->state == APPL_READY || a->state == APPL_READY_IDENTITY_ONLY);
 }
 
+unsigned appl_sweeps(const appliance_t *a)
+{
+    return a ? a->sweeps : 0;
+}
+
 const ts_registration_t *appl_identity(const appliance_t *a)
 {
     if (!a || !a->reg_valid)
@@ -462,7 +467,12 @@ result_t appl_tick(appliance_t *a, link_t *link, int64_t now_ms)
         return RES_OK;
     }
 
-    a->sweeping = false;
+    if (a->sweeping) {
+        /* The cursor reached the end: a full pass just finished, and only now
+         * is there a complete set of values to report. */
+        a->sweeping = false;
+        a->sweeps++;
+    }
 
     if (a->reg.n_caps > 0 && now_ms >= a->next_sweep_ms) {
         a->cursor   = 0;

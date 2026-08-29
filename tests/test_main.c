@@ -19,6 +19,7 @@ int main(void)
     test_config();
     test_mqtt();
     test_client();
+    test_control();
     test_uart();
     test_platform();
 

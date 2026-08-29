@@ -108,6 +108,40 @@ static void a_sweep_reads_every_capability(void)
     CHECK_EQ(appl_value(&a, 0x07, NULL), RES_EINVAL);
 }
 
+/*
+ * The moment an appliance is identified nothing has been read from it yet, so
+ * a caller that reports on sweep completion does not publish an empty
+ * attribute set that looks like a device with nothing to say.
+ */
+static void a_sweep_is_only_counted_once_it_finishes(void)
+{
+    sim_link_t  s;
+    link_t      l;
+    appliance_t a;
+
+    appliance(&s, &l);
+    model(&a);
+
+    pump(&a, &l, 0, 2);
+    CHECK_EQ(appl_state(&a), APPL_READY);
+    CHECK_EQ(appl_sweeps(&a), 0);          /* identified, nothing read */
+
+    pump(&a, &l, 0, 3);                    /* sweep started, one service read */
+    CHECK_EQ(appl_sweeps(&a), 0);
+
+    pump(&a, &l, 0, 6);                    /* the rest of the pass */
+    CHECK_EQ(appl_sweeps(&a), 1);
+
+    /* And it does not tick over again until the next interval has run. */
+    pump(&a, &l, 500, 6);
+    CHECK_EQ(appl_sweeps(&a), 1);
+
+    pump(&a, &l, 1000, 10);
+    CHECK_EQ(appl_sweeps(&a), 2);
+
+    CHECK_EQ(appl_sweeps(NULL), 0);
+}
+
 static void a_second_sweep_waits_for_its_interval(void)
 {
     sim_link_t  s;
@@ -513,6 +547,7 @@ void test_appliance(void)
 {
     it_identifies_the_appliance_before_polling();
     a_sweep_reads_every_capability();
+    a_sweep_is_only_counted_once_it_finishes();
     a_second_sweep_waits_for_its_interval();
     a_multibyte_appliance_is_identified_but_not_polled();
     a_dropped_reply_is_retried();

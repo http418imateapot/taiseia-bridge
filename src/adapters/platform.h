@@ -55,6 +55,17 @@ bool platform_iso8601_utc(char *out, size_t cap);
 
 void platform_sleep_ms(int ms);
 
+/* ------------------------------------------------------------ interruption */
+
+/**
+ * Catch the usual interrupt so that a shutdown is orderly: a bridge that is
+ * killed mid-exchange leaves an appliance waiting and no last word on the
+ * status topic.
+ */
+void platform_install_stop_handler(void);
+bool platform_stop_requested(void);
+void platform_request_stop(void);
+
 /* ------------------------------------------------------------------ logging */
 
 typedef enum {
