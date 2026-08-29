@@ -35,7 +35,9 @@ plus what the platform already provides.
 | Appliance model, sweep scheduling, writes | built, tested |
 | MQTT codec, topics, payloads, configuration | built, tested |
 | MQTT client, socket port | built, tested |
-| Platform adapters (sockets, serial), the applications | not started |
+| Platform adapters: sockets, serial, time, logging | built, tested |
+| TaiSEIA UART link adapter | built, tested |
+| The two applications | not started |
 | Serial adapters (POSIX, Windows) | not started |
 
 **No physical appliance has ever been connected to this code.** Verification is

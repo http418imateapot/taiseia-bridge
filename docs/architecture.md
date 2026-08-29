@@ -76,6 +76,11 @@ core/model ──▶ ports/appliance_link.h ◀── adapters/taiseia_uart
 adapters/taiseia_uart ──▶ ports/serial.h ◀── adapters/{posix,win32}
 ```
 
+All three southbound and northbound adapters now exist. `taiseia_uart` takes
+the `inline` strategy from the table below -- a state machine advanced one step
+per poll, no thread anywhere -- which is possible only because the framing
+above it is pure code.
+
 ## 4. Concurrency is not in the core
 
 `appliance_link` is asynchronous by contract: `submit` and `poll`, neither of
@@ -139,22 +144,26 @@ src/core/model/     appliance state, capability cache, sweep scheduling, writes
 src/core/mqtt/      MQTT 3.1.1 codec and client, topics, payloads, configuration
 src/core/util/      result type, bounded string builder, JSON reader and writer
 src/ports/          interfaces: appliance_link, serial, socket
-src/adapters/sim/   a simulated appliance, including fault injection
-src/adapters/       posix, win32                        (none today)
-src/apps/           bridge, cli                         (none today)
+src/adapters/sim/           a simulated appliance, with fault injection
+src/adapters/taiseia_uart/  the appliance link over a real UART
+src/adapters/posix/         sockets, serial, time
+src/adapters/win32/         sockets, serial, time
+src/apps/                   bridge, cli                 (none today)
 tests/              host tests; no platform, no hardware
 cmake/              the freestanding check
 ```
 
 ## 8. What is not built yet
 
-The platform adapters -- sockets and serial ports on POSIX and Windows -- the
-TaiSEIA UART adapter that sits on the serial port, and both applications.
+The two applications: the bridge that wires these pieces into a loop, and the
+command-line tool that talks to an appliance by hand.
 
-Everything above those is in place and tested: southbound framing and the
-appliance model, northbound codec, client, topics, payloads and configuration.
-All of it is logic over ports, so all of it is exercised by fakes rather than
-by hardware or a broker.
+Everything below them is built and tested -- the protocol, the appliance model,
+the MQTT codec and client, configuration, and both platforms' sockets, serial
+ports, clocks and logging. What is left is composition, not mechanism.
+
+Two protocol gaps remain detected and refused rather than half-handled: the
+multi-byte request layout, and fragmented registration replies.
 
 Two protocol gaps are detected and refused rather than half-handled: the
 multi-byte request layout (so those appliances are identified but not polled)
