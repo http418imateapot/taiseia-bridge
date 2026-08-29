@@ -44,6 +44,37 @@ void platform_shutdown(void)
     WSACleanup();
 }
 
+static volatile LONG g_stop;
+
+static BOOL WINAPI on_console_event(DWORD type)
+{
+    switch (type) {
+    case CTRL_C_EVENT:
+    case CTRL_BREAK_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        InterlockedExchange(&g_stop, 1);
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+void platform_install_stop_handler(void)
+{
+    (void)SetConsoleCtrlHandler(on_console_event, TRUE);
+}
+
+bool platform_stop_requested(void)
+{
+    return InterlockedCompareExchange(&g_stop, 0, 0) != 0;
+}
+
+void platform_request_stop(void)
+{
+    InterlockedExchange(&g_stop, 1);
+}
+
 int64_t platform_now_ms(void)
 {
     /* Monotonic and unaffected by the system clock being stepped, which is

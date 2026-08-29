@@ -44,6 +44,30 @@ void platform_shutdown(void)
 {
 }
 
+static volatile sig_atomic_t g_stop;
+
+static void on_signal(int sig)
+{
+    (void)sig;
+    g_stop = 1;
+}
+
+void platform_install_stop_handler(void)
+{
+    signal(SIGINT, on_signal);
+    signal(SIGTERM, on_signal);
+}
+
+bool platform_stop_requested(void)
+{
+    return g_stop != 0;
+}
+
+void platform_request_stop(void)
+{
+    g_stop = 1;
+}
+
 int64_t platform_now_ms(void)
 {
     struct timespec ts;

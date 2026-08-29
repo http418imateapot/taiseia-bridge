@@ -61,5 +61,6 @@ void test_mqtt(void);
 void test_client(void);
 void test_platform(void);
 void test_uart(void);
+void test_control(void);
 
 #endif /* TSB_TESTS_H */

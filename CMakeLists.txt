@@ -73,6 +73,7 @@ add_library(tsb_core STATIC
     src/core/mqtt/config.c
     src/core/mqtt/codec.c
     src/core/mqtt/client.c
+    src/core/mqtt/control.c
     src/ports/appliance_link.c
     src/ports/serial.c
     src/ports/socket.c)
@@ -107,6 +108,15 @@ else()
 endif()
 target_link_libraries(tsb_platform PRIVATE tsb_warnings)
 
+# ---------------------------------------------------------------------- apps
+add_executable(taiseia-bridge src/apps/bridge/main.c)
+target_link_libraries(taiseia-bridge
+    PRIVATE tsb_sim tsb_uart tsb_platform tsb_warnings)
+
+add_executable(taiseia-cli src/apps/cli/main.c)
+target_link_libraries(taiseia-cli
+    PRIVATE tsb_sim tsb_uart tsb_platform tsb_warnings)
+
 # --------------------------------------------------------------------- tests
 if(TSB_BUILD_TESTS)
     enable_testing()
@@ -124,7 +134,8 @@ if(TSB_BUILD_TESTS)
         tests/test_mqtt.c
         tests/test_client.c
         tests/test_platform.c
-        tests/test_uart.c)
+        tests/test_uart.c
+        tests/test_control.c)
     target_include_directories(tsb_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_link_libraries(tsb_tests PRIVATE tsb_sim tsb_uart tsb_platform tsb_warnings)
 
