@@ -61,6 +61,7 @@ typedef struct {
     int64_t           next_report_ms;
     bool              was_online;
     bool              status_sent;
+    unsigned          last_sweeps;
 
     char              buf[MQTT_PAYLOAD_MAX];
     strbuf_t          sb;
@@ -527,16 +528,23 @@ int main(int argc, char *argv[])
                 publish_status(b, online);
                 b->was_online  = online;
                 b->status_sent = true;
-
-                /* Something changed, so say what it is now rather than at the
-                 * next interval -- which may be a minute away. */
-                b->next_report_ms = now;
             }
         }
 
-        if (now >= b->next_report_ms) {
-            publish_reports(b);
-            b->next_report_ms = now + b->cfg.report_interval_s * 1000;
+        {
+            unsigned sweeps = appl_sweeps(&b->appl);
+
+            /*
+             * Report when a sweep finishes, or when the interval comes round
+             * with nothing having finished -- an appliance that is offline
+             * still gets reported, but one that has just come online is not
+             * reported before anything has been read from it.
+             */
+            if (sweeps != b->last_sweeps || now >= b->next_report_ms) {
+                publish_reports(b);
+                b->last_sweeps    = sweeps;
+                b->next_report_ms = now + b->cfg.report_interval_s * 1000;
+            }
         }
 
         if (run_for > 0 && now - started >= run_for * 1000)

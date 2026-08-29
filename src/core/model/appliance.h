@@ -137,6 +137,7 @@ typedef struct {
     int64_t           stuck_deadline_ms;
 
     unsigned          consecutive_failures;
+    unsigned          sweeps;   /* completed passes over the capability set */
 
     appl_write_batch_t write;
 } appliance_t;
@@ -157,6 +158,15 @@ bool appl_online(const appliance_t *a);
 
 /** The registration data, or NULL before the appliance has been identified. */
 const ts_registration_t *appl_identity(const appliance_t *a);
+
+/**
+ * How many full passes over the capability set have finished.
+ *
+ * A caller that reports on a schedule wants this too: the moment an appliance
+ * comes online nothing has been read yet, and a report sent then carries an
+ * empty attribute set that looks like a device with nothing to say.
+ */
+unsigned appl_sweeps(const appliance_t *a);
 
 /** Latest value of one service. RES_ENOTFOUND when absent or stale. */
 result_t appl_value(const appliance_t *a, uint8_t service_id, uint16_t *out);
