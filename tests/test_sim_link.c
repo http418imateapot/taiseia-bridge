@@ -77,7 +77,8 @@ static void a_write_takes_effect_and_is_echoed(void)
 
     /* Reading it back must show the value that was written. */
     memset(&req, 0, sizeof(req));
-    req.id = 2; req.op = LINK_OP_READ; req.value = 0;
+    req.id = 2; req.op = LINK_OP_READ; req.sa_id = 0x04;
+    req.service_id = 0x00; req.value = 0;
     CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
     CHECK_EQ((resp.data[0] << 8) | resp.data[1], 3);
 }
@@ -100,7 +101,8 @@ static void writing_a_read_only_service_is_refused(void)
 
     /* And the value must be untouched. */
     memset(&req, 0, sizeof(req));
-    req.id = 4; req.op = LINK_OP_READ; req.value = 0;
+    req.id = 4; req.op = LINK_OP_READ; req.sa_id = 0x04;
+    req.service_id = 0x07; req.value = 0;
     CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
     CHECK_EQ((resp.data[0] << 8) | resp.data[1], 62);
 }
