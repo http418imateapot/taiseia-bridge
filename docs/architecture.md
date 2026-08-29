@@ -59,6 +59,10 @@ Roughly 150 lines per platform, with nothing subtle in it.
 **`ports/appliance_link.h` — transactions.** Read a service, write a service,
 ask the appliance to describe itself.
 
+Northbound there is a third, `ports/socket.h`, on the same terms: nothing
+blocks, and connecting is a loop of RES_EAGAIN rather than a call that stalls
+the program against an unreachable broker.
+
 Framing lives in the core, between the two, so it is written once and tested
 once. But framing cannot be the *only* seam: Modbus does not share TaiSEIA's
 packet layout, so a Modbus adapter cannot be expressed as "core framing over a
@@ -132,9 +136,9 @@ processes.
 ```
 src/core/taiseia/   framing, checksums, data types, registration, limits
 src/core/model/     appliance state, capability cache, sweep scheduling, writes
-src/core/mqtt/      MQTT 3.1.1 codec, topic templates, payloads, configuration
+src/core/mqtt/      MQTT 3.1.1 codec and client, topics, payloads, configuration
 src/core/util/      result type, bounded string builder, JSON reader and writer
-src/ports/          interfaces: appliance_link, serial
+src/ports/          interfaces: appliance_link, serial, socket
 src/adapters/sim/   a simulated appliance, including fault injection
 src/adapters/       posix, win32                        (none today)
 src/apps/           bridge, cli                         (none today)
@@ -144,10 +148,13 @@ cmake/              the freestanding check
 
 ## 8. What is not built yet
 
-The MQTT client that opens a socket and drives the codec, a socket port, the
-serial adapters, and both applications. Everything that is a pure function --
-southbound framing and the appliance model, northbound codec, topics, payloads
-and configuration -- is in place and tested. What remains is the I/O around it.
+The platform adapters -- sockets and serial ports on POSIX and Windows -- the
+TaiSEIA UART adapter that sits on the serial port, and both applications.
+
+Everything above those is in place and tested: southbound framing and the
+appliance model, northbound codec, client, topics, payloads and configuration.
+All of it is logic over ports, so all of it is exercised by fakes rather than
+by hardware or a broker.
 
 Two protocol gaps are detected and refused rather than half-handled: the
 multi-byte request layout (so those appliances are identified but not polled)

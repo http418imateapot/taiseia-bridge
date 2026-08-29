@@ -58,5 +58,6 @@ void test_appliance(void);
 void test_payload(void);
 void test_config(void);
 void test_mqtt(void);
+void test_client(void);
 
 #endif /* TSB_TESTS_H */
