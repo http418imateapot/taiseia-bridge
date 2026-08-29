@@ -234,7 +234,8 @@ static bool stamp_now(char *out, size_t cap)
     return platform_iso8601_utc(out, cap);
 }
 
-static void publish_status(bridge_t *b, bool online)
+/* True when the status actually reached the broker. */
+static bool publish_status(bridge_t *b, bool online)
 {
     char stamp[PLATFORM_TIMESTAMP_MAX];
 
@@ -242,8 +243,10 @@ static void publish_status(bridge_t *b, bool online)
         stamp[0] = '\0';
 
     if (payload_status(&b->sb, b->cfg.device_id,
-                       stamp[0] ? stamp : NULL, online) == RES_OK)
-        emit(b, CFG_TOPIC_STATUS, b->cfg.retain_status);
+                       stamp[0] ? stamp : NULL, online) != RES_OK)
+        return false;
+
+    return emit(b, CFG_TOPIC_STATUS, b->cfg.retain_status);
 }
 
 static void publish_reports(bridge_t *b)
