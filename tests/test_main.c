@@ -22,6 +22,7 @@ int main(void)
     test_control();
     test_uart();
     test_platform();
+    test_serial_pty();
 
     printf("%d checks, %d failures\n", g_checks, g_failures);
 
