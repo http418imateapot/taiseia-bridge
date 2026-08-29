@@ -164,7 +164,7 @@ static void options(mqttc_options_t *o)
     o->port             = 1883;
     o->client_id        = "C";
     o->keepalive_s      = 10;
-    o->subscribe_topic  = "v1/to/device/C/control";
+    o->subscribe_topic  = "taiseia101/v1/to/appliance/C/command";
     o->reconnect_min_ms = 100;
     o->reconnect_max_ms = 800;
     o->on_message       = on_message;
@@ -517,9 +517,9 @@ static void two_small_publishes_in_one_pass_both_fit(void)
     bring_up(&c, &f, &s);
     before = f.out_len;
 
-    CHECK_EQ(mqttc_publish(&c, "v1/from/device/D/telemetry", "{\"a\":1}", 7,
+    CHECK_EQ(mqttc_publish(&c, "taiseia101/v1/from/appliance/D/telemetry", "{\"a\":1}", 7,
                            false), RES_OK);
-    CHECK_EQ(mqttc_publish(&c, "v1/from/device/D/capabilities", "{\"b\":2}", 7,
+    CHECK_EQ(mqttc_publish(&c, "taiseia101/v1/from/appliance/D/capabilities", "{\"b\":2}", 7,
                            true), RES_OK);
 
     CHECK_EQ(mqttc_tick(&c, &s, 0), RES_OK);

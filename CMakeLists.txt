@@ -71,6 +71,7 @@ add_library(tsb_core STATIC
     src/core/taiseia/frame.c
     src/core/taiseia/datatype.c
     src/core/taiseia/registration.c
+    src/core/taiseia/reassembly.c
     src/core/model/appliance.c
     src/core/mqtt/topic.c
     src/core/mqtt/payload.c
@@ -129,6 +130,8 @@ if(TSB_BUILD_TESTS)
         tests/test_main.c
         tests/test_json.c
         tests/test_frame.c
+        tests/test_frame_mb.c
+        tests/test_reassembly.c
         tests/test_datatype.c
         tests/test_registration.c
         tests/test_sim_link.c
@@ -139,6 +142,7 @@ if(TSB_BUILD_TESTS)
         tests/test_client.c
         tests/test_platform.c
         tests/test_serial_pty.c
+        tests/test_serial_win32.c
         tests/test_uart.c
         tests/test_control.c)
     target_include_directories(tsb_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)

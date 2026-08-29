@@ -28,12 +28,33 @@ typedef enum {
     LINK_OP_REGISTER   /* SA id 0x00: ask the appliance to describe itself */
 } link_op_t;
 
+/*
+ * A request.
+ *
+ * **Zero the whole struct before filling it.** Fields are added here as the
+ * protocol is covered, and every one of them defaults to off -- but only if it
+ * was zeroed. A stale byte in `multibyte` turns an ordinary read into a
+ * malformed one, which the adapters refuse loudly rather than send, though
+ * that is a poor substitute for initialising it.
+ */
 typedef struct {
     uint32_t  id;          /* caller's correlation id, echoed in the reply  */
     link_op_t op;
     uint8_t   sa_id;
     uint8_t   service_id;
-    uint16_t  value;       /* LINK_OP_WRITE only                            */
+    uint16_t  value;       /* LINK_OP_WRITE, general format only            */
+
+    /*
+     * The multi-byte format, used by meters and sensors. `data` is borrowed
+     * for the duration of the submit call only: an adapter copies whatever it
+     * needs before returning.
+     */
+    bool           multibyte;
+    uint8_t        dtype;
+    size_t         value_len;   /* one item's width, for a read             */
+    uint16_t       count;       /* items, for a write                       */
+    const uint8_t *data;        /* items, for a write                       */
+    size_t         data_len;
 } link_req_t;
 
 typedef struct {
@@ -42,8 +63,16 @@ typedef struct {
     uint8_t  sa_id;
     uint8_t  service_id;
     bool     write;
+
+    /* Set when the reply came back in the multi-byte format. */
+    bool     multibyte;
+    uint8_t  dtype;
+    uint32_t count;        /* items, summed across any fragments            */
+
+    /* Sized for a reassembled reply, not for one packet: a fragmented answer
+     * is joined up before anything above the transport sees it. */
     size_t   data_len;
-    uint8_t  data[TS_DATA_MAX];
+    uint8_t  data[TS_REASSEMBLY_MAX];
 } link_resp_t;
 
 typedef struct {

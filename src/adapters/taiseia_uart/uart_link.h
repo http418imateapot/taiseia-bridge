@@ -29,7 +29,9 @@
 #ifndef TSB_ADAPTERS_UART_LINK_H
 #define TSB_ADAPTERS_UART_LINK_H
 
+#include "core/taiseia/frame.h"
 #include "core/taiseia/limits.h"
+#include "core/taiseia/reassembly.h"
 #include "core/util/result.h"
 #include "ports/appliance_link.h"
 #include "ports/serial.h"
@@ -49,10 +51,14 @@ typedef struct {
     serial_t   *sp;
     int64_t   (*now_ms)(void);
 
-    ul_phase_t  phase;
-    uint32_t    req_id;
+    ul_phase_t      phase;
+    uint32_t        req_id;
+    ts_reply_kind_t kind;    /* what shape the answer will be in */
+    ts_reasm_t      reasm;
 
-    uint8_t     req[TS_GENERAL_REQ_LEN];
+    /* Sized for any request, not just the six-byte one: a multi-byte write
+     * carries as many items as the caller asked for. */
+    uint8_t     req[TS_FRAME_MAX_LEN];
     size_t      req_len;
     size_t      req_sent;
 
@@ -69,6 +75,10 @@ typedef struct {
  * `now_ms` is required, not optional: it is what makes the two deadlines
  * testable by passing numbers instead of by sleeping. Applications pass
  * platform_now_ms.
+ *
+ * A reply that arrives in fragments is joined up here before anything above
+ * sees it, and each fragment gets the same 200 ms the first one did -- which
+ * is what stops a long, legitimate answer being judged a timeout.
  */
 result_t uart_link_init(uart_link_t *u, serial_t *sp, int64_t (*now_ms)(void));
 

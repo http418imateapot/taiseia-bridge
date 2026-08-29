@@ -37,15 +37,21 @@ plus what the platform already provides.
 | MQTT client, socket port | built, tested |
 | Platform adapters: sockets, serial, time, logging | built, tested |
 | TaiSEIA UART link adapter | built, tested |
+| Multi-byte requests and fragment reassembly | built, tested |
+| Serial adapter (POSIX) | built, tested through a real device |
+| Serial adapter (Windows) | built; byte path unverified — see below |
 | The two applications | built, smoke-tested |
-| Serial adapters (POSIX, Windows) | not started |
 
-**No physical appliance has ever been connected to this code**, and no real
-broker. Verification is by CI — Linux with AddressSanitizer and UBSan, Linux
-release, and MSVC — by a simulator that encodes and decodes real packets, by
-real loopback sockets on both platforms, by a real serial device on POSIX, and by a real MQTT broker.
+**No physical appliance has ever been connected to this code.** Verification is
+by CI — Linux with AddressSanitizer and UBSan, Linux release, and MSVC — by a
+simulator that encodes and decodes real packets, by real loopback sockets on
+both platforms, by a real serial device on POSIX, and by a real MQTT broker.
 None of that is evidence about an actual appliance.
-See [docs/testing.md](docs/testing.md).
+
+The **Windows serial adapter has never carried a byte in a test**: a virtual
+COM pair needs a kernel driver no hosted CI runner can install. Its argument
+checks and failure paths do run there. The full exchange is written and skips
+unless you point it at a real pair. See [docs/testing.md](docs/testing.md).
 
 ---
 
@@ -87,10 +93,10 @@ the whole path is visible:
 
 ```
 info  taiseia-bridge 0.1.0-dev starting as SIM-0001
-info  v1/from/device/SIM-0001/status {"device_id":"SIM-0001",...,"online":true}
-info  v1/from/device/SIM-0001/telemetry {...,"sa_id":4,"online":true,
+info  taiseia101/v1/from/appliance/SIM-0001/status {"device_id":"SIM-0001",...}
+info  taiseia101/v1/from/appliance/SIM-0001/telemetry {...,"sa_id":4,"online":true,
       "attributes":{"0":1,"3":55,"7":62}}
-info  v1/from/device/SIM-0001/capabilities {...,"format":"general",
+info  taiseia101/v1/from/appliance/SIM-0001/capabilities {...,"format":"general",
       "make":"SIMULATOR","model":"SIM-0001","capabilities":[...]}
 ```
 

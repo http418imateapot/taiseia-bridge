@@ -517,6 +517,286 @@ static void a_write_failure_ends_the_exchange(void)
     CHECK_EQ(resp.status, RES_EIO);
 }
 
+/* ------------------------------------------------------- multi-byte replies */
+
+/* One multi-byte fragment carrying `count` single-byte items of `fill`. */
+static size_t mb_reply(uint8_t *out, uint16_t fragment, uint8_t sa,
+                       uint8_t service, uint8_t dtype, uint16_t count,
+                       uint8_t fill)
+{
+    size_t len = TS_MB_OVERHEAD + count;
+    size_t i;
+
+    out[0] = (uint8_t)len;
+    out[1] = sa;
+    out[2] = service;
+    out[3] = TS_MB_RESERVED;
+    out[4] = (uint8_t)((fragment >> 8) & 0xFFu);
+    out[5] = (uint8_t)(fragment & 0xFFu);
+    out[6] = dtype;
+    out[7] = (uint8_t)((count >> 8) & 0xFFu);
+    out[8] = (uint8_t)(count & 0xFFu);
+    for (i = 0; i < count; i++)
+        out[TS_MB_DATA_OFFSET + i] = fill;
+    out[len - 1u] = ts_checksum(out, len - 1u);
+
+    return len;
+}
+
+static void a_multibyte_read_asks_in_the_wider_layout(void)
+{
+    fake_serial_t f;
+    serial_t      sp;
+    uart_link_t   u;
+    link_t        l;
+    link_req_t    req;
+    link_resp_t   resp;
+    uint8_t       reply[32];
+    size_t        n;
+
+    wire(&f, &sp, &u, &l);
+    memset(&req, 0, sizeof(req));
+    req.id = 11; req.op = LINK_OP_READ; req.sa_id = 0xE0;
+    req.service_id = 0x20;
+    req.multibyte = true; req.dtype = 0x21; req.value_len = 2;
+
+    CHECK_EQ(link_submit(&l, &req), RES_OK);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    CHECK_EQ(f.out_len, TS_MB_OVERHEAD + 2u);
+    CHECK_EQ(f.out[0], TS_MB_OVERHEAD + 2u);
+    CHECK_EQ(f.out[2], 0x20);                 /* read: no write bit        */
+    CHECK_EQ(f.out[3], TS_MB_RESERVED);
+    CHECK_EQ(f.out[6], 0x21);
+    CHECK_EQ(f.out[7], 0xFF);                 /* asking, not telling       */
+    CHECK_EQ(f.out[8], 0xFF);
+    CHECK_EQ(f.out[9], 0xFF);
+    CHECK_EQ(f.out[10], 0xFF);
+
+    n = mb_reply(reply, 0, 0xE0, 0x20, 0x21, 2, 0x5A);
+    feed(&f, reply, n);
+
+    CHECK_EQ(link_poll(&l, &resp), RES_OK);
+    CHECK_EQ(resp.id, 11);
+    CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(resp.multibyte, 1);
+    CHECK_EQ(resp.dtype, 0x21);
+    CHECK_EQ(resp.count, 2);
+    CHECK_EQ(resp.data_len, 2);
+    CHECK_EQ(resp.data[0], 0x5A);
+    CHECK_EQ(resp.data[1], 0x5A);
+}
+
+/*
+ * A long answer arrives as several packets, and each one gets its own 200 ms.
+ * The clock is moved past the first deadline between fragments deliberately:
+ * a single deadline for the whole reply would cut off a legitimate one.
+ */
+static void a_fragmented_reply_is_gathered_across_deadlines(void)
+{
+    fake_serial_t f;
+    serial_t      sp;
+    uart_link_t   u;
+    link_t        l;
+    link_req_t    req;
+    link_resp_t   resp;
+    uint8_t       reply[32];
+    size_t        n;
+
+    wire(&f, &sp, &u, &l);
+    memset(&req, 0, sizeof(req));
+    req.id = 12; req.op = LINK_OP_READ; req.sa_id = 0xE0;
+    req.service_id = 0x30;
+    req.multibyte = true; req.dtype = 0x20; req.value_len = 1;
+
+    CHECK_EQ(link_submit(&l, &req), RES_OK);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    n = mb_reply(reply, 2, 0xE0, 0x30, 0x20, 4, 0x11);
+    feed(&f, reply, n);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    g_now += TS_RESPONSE_TIMEOUT_MS - 10;
+    n = mb_reply(reply, 1, 0xE0, 0x30, 0x20, 4, 0x22);
+    feed(&f, reply, n);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    /* Well past the deadline the first fragment set, but not past the one
+     * the second fragment renewed. */
+    g_now += TS_RESPONSE_TIMEOUT_MS - 10;
+    n = mb_reply(reply, 0, 0xE0, 0x30, 0x20, 2, 0x33);
+    feed(&f, reply, n);
+
+    CHECK_EQ(link_poll(&l, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(resp.multibyte, 1);
+    CHECK_EQ(resp.count, 10);
+    CHECK_EQ(resp.data_len, 10);
+    CHECK_EQ(resp.data[0], 0x11);
+    CHECK_EQ(resp.data[4], 0x22);
+    CHECK_EQ(resp.data[8], 0x33);
+    CHECK_EQ(resp.data[9], 0x33);
+}
+
+/* Silence after a fragment is still a timeout: an unfinished reply must not
+ * be handed over as if it were whole. */
+static void a_reply_that_stops_mid_stream_times_out(void)
+{
+    fake_serial_t f;
+    serial_t      sp;
+    uart_link_t   u;
+    link_t        l;
+    link_req_t    req;
+    link_resp_t   resp;
+    uint8_t       reply[32];
+    size_t        n;
+
+    wire(&f, &sp, &u, &l);
+    memset(&req, 0, sizeof(req));
+    req.id = 13; req.op = LINK_OP_READ; req.sa_id = 0xE0;
+    req.service_id = 0x30;
+    req.multibyte = true; req.dtype = 0x20; req.value_len = 1;
+
+    CHECK_EQ(link_submit(&l, &req), RES_OK);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    n = mb_reply(reply, 1, 0xE0, 0x30, 0x20, 4, 0x11);
+    feed(&f, reply, n);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    g_now += TS_RESPONSE_TIMEOUT_MS + 1;
+    CHECK_EQ(link_poll(&l, &resp), RES_OK);
+    CHECK_EQ(resp.id, 13);
+    CHECK_EQ(resp.status, RES_ETIMEOUT);
+    CHECK_EQ(resp.data_len, 0);
+}
+
+/* A registration reply in two pieces, joined before the model sees it. */
+static void a_fragmented_registration_reply_is_joined(void)
+{
+    fake_serial_t f;
+    serial_t      sp;
+    uart_link_t   u;
+    link_t        l;
+    link_req_t    req;
+    link_resp_t   resp;
+    uint8_t       pkt[64];
+    size_t        pos;
+    size_t        len;
+
+    wire(&f, &sp, &u, &l);
+    memset(&req, 0, sizeof(req));
+    req.id = 16; req.op = LINK_OP_REGISTER; req.sa_id = 0x04;
+
+    CHECK_EQ(link_submit(&l, &req), RES_OK);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    pos = 2;
+    pkt[pos++] = 0x01; pkt[pos++] = 0x01; pkt[pos++] = 0x00;
+    pkt[pos++] = (uint8_t)((1u << 4) | 0x04u);
+    pkt[pos++] = 0x00; pkt[pos++] = 0x04;
+    pkt[pos++] = 0xA1; pkt[pos++] = 0xA2;
+    len = pos + 1u;
+    pkt[0] = (uint8_t)len;
+    pkt[1] = 0x00;
+    pkt[len - 1u] = ts_checksum(pkt, len - 1u);
+    feed(&f, pkt, len);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    pos = 2;
+    pkt[pos++] = 0x01; pkt[pos++] = 0x01; pkt[pos++] = 0x00;
+    pkt[pos++] = 0x04;
+    pkt[pos++] = 0x00; pkt[pos++] = 0x04;
+    pkt[pos++] = 0xB1;
+    len = pos + 1u;
+    pkt[0] = (uint8_t)len;
+    pkt[1] = 0x00;
+    pkt[len - 1u] = ts_checksum(pkt, len - 1u);
+    feed(&f, pkt, len);
+
+    CHECK_EQ(link_poll(&l, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(resp.multibyte, 0);
+    /* Header once, then both payloads. */
+    CHECK_EQ(resp.data_len, 9);
+    CHECK_EQ(resp.data[3], 0x04);       /* whole, so no fragment number */
+    CHECK_EQ(resp.data[6], 0xA1);
+    CHECK_EQ(resp.data[7], 0xA2);
+    CHECK_EQ(resp.data[8], 0xB1);
+}
+
+/*
+ * Both fragments in one read. At 9600 bps an appliance can put the next
+ * fragment on the wire before we poll again, so the second one has to survive
+ * being buffered behind the first.
+ */
+static void two_fragments_in_one_read_are_both_taken(void)
+{
+    fake_serial_t f;
+    serial_t      sp;
+    uart_link_t   u;
+    link_t        l;
+    link_req_t    req;
+    link_resp_t   resp;
+    uint8_t       reply[32];
+    size_t        n;
+
+    wire(&f, &sp, &u, &l);
+    memset(&req, 0, sizeof(req));
+    req.id = 15; req.op = LINK_OP_READ; req.sa_id = 0xE0;
+    req.service_id = 0x30;
+    req.multibyte = true; req.dtype = 0x20; req.value_len = 1;
+
+    CHECK_EQ(link_submit(&l, &req), RES_OK);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    n = mb_reply(reply, 1, 0xE0, 0x30, 0x20, 3, 0x77);
+    feed(&f, reply, n);
+    n = mb_reply(reply, 0, 0xE0, 0x30, 0x20, 3, 0x88);
+    feed(&f, reply, n);
+
+    CHECK_EQ(link_poll(&l, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(resp.count, 6);
+    CHECK_EQ(resp.data_len, 6);
+    CHECK_EQ(resp.data[0], 0x77);
+    CHECK_EQ(resp.data[2], 0x77);
+    CHECK_EQ(resp.data[3], 0x88);
+    CHECK_EQ(resp.data[5], 0x88);
+}
+
+/* A multi-byte write says how many items it carries and hands them over
+ * unchanged. */
+static void a_multibyte_write_carries_its_items(void)
+{
+    fake_serial_t f;
+    serial_t      sp;
+    uart_link_t   u;
+    link_t        l;
+    link_req_t    req;
+    link_resp_t   resp;
+    static const uint8_t data[] = { 0x00, 0x00, 0x04, 0xD2 };
+
+    wire(&f, &sp, &u, &l);
+    memset(&req, 0, sizeof(req));
+    req.id = 14; req.op = LINK_OP_WRITE; req.sa_id = 0xE0;
+    req.service_id = 0x40;
+    req.multibyte = true; req.dtype = 0x22; req.value_len = 4;
+    req.count = 1; req.data = data; req.data_len = sizeof(data);
+
+    CHECK_EQ(link_submit(&l, &req), RES_OK);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    CHECK_EQ(f.out_len, TS_MB_OVERHEAD + 4u);
+    CHECK_EQ(f.out[2], TS_SVC_WRITE_BIT | 0x40);
+    CHECK_EQ(f.out[6], 0x22);
+    CHECK_EQ(f.out[7], 0x00);
+    CHECK_EQ(f.out[8], 0x01);
+    CHECK(memcmp(f.out + TS_MB_DATA_OFFSET, data, sizeof(data)) == 0);
+    CHECK_EQ(f.out[f.out_len - 1u],
+             ts_checksum(f.out, f.out_len - 1u));
+}
+
 void test_uart(void)
 {
     a_read_exchange_puts_the_right_bytes_on_the_wire();
@@ -530,4 +810,10 @@ void test_uart(void)
     a_partial_write_is_resumed();
     the_adapter_refuses_what_it_cannot_do();
     a_write_failure_ends_the_exchange();
+    a_multibyte_read_asks_in_the_wider_layout();
+    a_fragmented_reply_is_gathered_across_deadlines();
+    a_reply_that_stops_mid_stream_times_out();
+    a_fragmented_registration_reply_is_joined();
+    two_fragments_in_one_read_are_both_taken();
+    a_multibyte_write_carries_its_items();
 }

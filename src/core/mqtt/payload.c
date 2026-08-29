@@ -70,6 +70,67 @@ result_t payload_status(strbuf_t *sb, const char *device_id,
     return finish(&w);
 }
 
+/*
+ * One attribute.
+ *
+ * The general format has a two-byte value and nothing on the wire to say
+ * whether it is signed, so it goes out unsigned. The multi-byte format brings
+ * a type and a count with it, so a single item becomes a number -- signed if
+ * the type says so -- and several become an array.
+ *
+ * Anything whose width this cannot decode goes out as hex rather than as a
+ * guess: a six-byte timestamp, a composite, a string whose encoding is not
+ * ours to assume.
+ */
+static void put_attribute(jsonw_t *w, const appl_value_t *v)
+{
+    const ts_datatype_t *t;
+    size_t               items;
+    size_t               i;
+
+    jw_key_uint(w, v->service_id);
+
+    if (!v->multibyte) {
+        jw_uint(w, v->value);
+        return;
+    }
+
+    t = ts_datatype(v->dtype);
+    if (!t || t->value_len == 0 || v->raw_len == 0 ||
+        v->raw_len % t->value_len != 0) {
+        jw_hex(w, v->raw, v->raw_len);
+        return;
+    }
+
+    items = v->raw_len / t->value_len;
+
+    if (items == 1) {
+        int64_t x = 0;
+
+        if (ts_decode_int(v->raw, t->value_len, t->is_signed, &x) != RES_OK)
+            jw_hex(w, v->raw, v->raw_len);
+        else if (t->is_signed)
+            jw_int(w, x);
+        else
+            jw_uint(w, (uint64_t)x);
+        return;
+    }
+
+    jw_arr_open(w);
+    for (i = 0; i < items; i++) {
+        int64_t x = 0;
+
+        if (ts_decode_int(v->raw + i * t->value_len, t->value_len,
+                          t->is_signed, &x) != RES_OK)
+            jw_hex(w, v->raw + i * t->value_len, t->value_len);
+        else if (t->is_signed)
+            jw_int(w, x);
+        else
+            jw_uint(w, (uint64_t)x);
+    }
+    jw_arr_close(w);
+}
+
 result_t payload_telemetry(strbuf_t *sb, const char *device_id,
                            const char *iso_time, const appliance_t *a)
 {
@@ -99,8 +160,7 @@ result_t payload_telemetry(strbuf_t *sb, const char *device_id,
         for (i = 0; i < a->n_values; i++) {
             if (!a->values[i].valid)
                 continue;
-            jw_key_uint(&w, a->values[i].service_id);
-            jw_uint(&w, a->values[i].value);
+            put_attribute(&w, &a->values[i]);
         }
     }
     jw_obj_close(&w);

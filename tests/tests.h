@@ -51,6 +51,8 @@ extern int g_failures;
 
 void test_json(void);
 void test_frame(void);
+void test_frame_mb(void);
+void test_reassembly(void);
 void test_datatype(void);
 void test_registration(void);
 void test_sim_link(void);
@@ -61,6 +63,7 @@ void test_mqtt(void);
 void test_client(void);
 void test_platform(void);
 void test_serial_pty(void);
+void test_serial_win32(void);
 void test_uart(void);
 void test_control(void);
 

@@ -38,6 +38,7 @@ typedef struct {
     uint16_t value;
     bool     clamps;      /* store clamp_to instead of what was written    */
     uint16_t clamp_to;
+    uint16_t items;       /* how many items a read of this service returns */
     uint8_t  support[TS_SUPPORT_MAX_BYTES];
     size_t   support_len;
 } sim_service_t;
@@ -114,6 +115,16 @@ void sim_link_corrupt_next(sim_link_t *s);
  * write was not taken as asked.
  */
 result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to);
+
+/**
+ * Make one service answer a read with `n` copies of its value.
+ *
+ * A multi-byte read asks for whatever the appliance has, not for a fixed
+ * number, so a meter answering with a batch of samples is the normal case and
+ * not an edge one. Ignored in the general record format, which has room for
+ * exactly one two-byte value.
+ */
+result_t sim_link_set_items(sim_link_t *s, uint8_t service_id, uint16_t n);
 
 /** Take the link down, as a pulled cable would. */
 void sim_link_set_down(sim_link_t *s);

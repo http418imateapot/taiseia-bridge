@@ -42,10 +42,9 @@
 #define APPL_STUCK_DEADLINE_MS  5000
 
 typedef enum {
-    APPL_DOWN = 0,            /* no usable link, or nothing has answered   */
-    APPL_IDENTIFYING,         /* a registration request is outstanding     */
-    APPL_READY,               /* identity known, services being polled     */
-    APPL_READY_IDENTITY_ONLY  /* identity known, services not pollable     */
+    APPL_DOWN = 0,      /* no usable link, or nothing has answered         */
+    APPL_IDENTIFYING,   /* a registration request is outstanding           */
+    APPL_READY          /* identity known, services being polled           */
 } appl_state_t;
 
 /*
@@ -81,10 +80,19 @@ typedef struct {
 
 typedef struct {
     uint8_t  service_id;
-    uint16_t value;
     bool     valid;
     int64_t  updated_ms;
     unsigned misses;        /* consecutive failed reads of this service */
+
+    /* The general format carries one two-byte value and nothing to say what
+     * it means. The multi-byte format carries a type, a count, and that many
+     * items -- so both are kept, and `multibyte` says which is real. */
+    uint16_t value;
+    bool     multibyte;
+    uint8_t  dtype;
+    uint32_t count;
+    uint8_t  raw[TS_VALUE_MAX_BYTES];
+    size_t   raw_len;
 } appl_value_t;
 
 typedef struct {
@@ -136,6 +144,10 @@ typedef struct {
     unsigned          attempt;
     int64_t           stuck_deadline_ms;
 
+    /* One widened item, for a multi-byte write. Held here rather than on a
+     * stack because the port borrows the pointer until submit returns. */
+    uint8_t           wbuf[TS_VALUE_MAX_BYTES];
+
     unsigned          consecutive_failures;
     unsigned          sweeps;   /* completed passes over the capability set */
 
@@ -170,6 +182,15 @@ unsigned appl_sweeps(const appliance_t *a);
 
 /** Latest value of one service. RES_ENOTFOUND when absent or stale. */
 result_t appl_value(const appliance_t *a, uint8_t service_id, uint16_t *out);
+
+/**
+ * The whole cached reading, however wide it is.
+ *
+ * NULL when the service is absent or its last read failed. Callers that only
+ * want a number use appl_value; callers that have to render whatever the
+ * appliance sent -- a batch of sensor readings, a string -- need this.
+ */
+const appl_value_t *appl_reading(const appliance_t *a, uint8_t service_id);
 
 /**
  * Start a batch of writes, as one control command asks for.

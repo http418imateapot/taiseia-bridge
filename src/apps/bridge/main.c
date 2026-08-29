@@ -501,7 +501,7 @@ int main(int argc, char *argv[])
         o.will_payload    = b->will;
         o.will_len        = strlen(b->will);
         o.will_retain     = b->cfg.retain_status;
-        o.subscribe_topic = b->topic[CFG_TOPIC_CONTROL];
+        o.subscribe_topic = b->topic[CFG_TOPIC_COMMAND];
         o.on_message      = on_message;
         o.ctx             = b;
 

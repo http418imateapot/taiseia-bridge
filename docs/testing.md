@@ -8,7 +8,7 @@ Everything in `src/core` and `src/adapters/sim`, on every push, by CI:
 |---|---|
 | linux / gcc / asan+ubsan | AddressSanitizer and UBSan, non-recovering; warnings are errors; the pseudo-terminal tests; the broker integration test |
 | linux / gcc / release | optimised build, no sanitizers — different code, different bugs |
-| windows / msvc | a second compiler and a second standard library |
+| windows / msvc | a second compiler and a second standard library; the Windows serial adapter's argument checks and failure paths, on a real Windows machine |
 
 `-fno-sanitize-recover=all` matters: without it UBSan prints a line into a log
 nobody reads and the build stays green.
@@ -39,9 +39,10 @@ establishes that:
 - a USB-to-UART adapter meets the 30 ms inter-byte ceiling on any particular
   operating system;
 - any specific device's registration payload parses;
-- the **Windows** serial adapter works at all -- nothing in CI can open a
-  serial port there, so it is exercised only through the port interface by a
-  fake. The POSIX one is now driven through a real device (below);
+- the **Windows** serial adapter can carry a byte. Its argument checks, its
+  refusal of a handle that is not a serial port, and the state of a closed port
+  now run on a real Windows machine in CI; the byte-carrying half does not, and
+  cannot. See "The Windows serial gap" below;
 
 - the protocol has been read correctly at all.
 
@@ -109,8 +110,50 @@ What this reaches and a fake cannot:
 - **A silent peer times out on the protocol's schedule**, measured against a
   real clock.
 
-Windows has no equivalent that can be opened in CI, so its serial adapter
-remains the least-verified thing in the project.
+Windows has no equivalent, which is the subject of the next section.
+
+## The Windows serial gap
+
+**This one is open, and it is not closing in CI.** Saying so is the point of
+this section.
+
+A Windows virtual COM pair needs a kernel-mode driver. Every free one --
+com0com and its forks -- ships test-signed, so using it means enabling test
+signing and rebooting, and a hosted runner cannot reboot in the middle of a
+job. The commercial alternatives are not something an open-source project can
+require of a contributor. There is no user-mode substitute: a named pipe opens
+happily under `CreateFile`, but `GetCommState` fails on it, which is exactly
+the behaviour the adapter relies on to reject a handle that is not a port.
+
+So `tests/test_serial_win32.c` runs what needs no port, on a real Windows
+machine, against the real adapter:
+
+- **Bad line settings are refused before anything is opened** -- seven data
+  bits, two stop bits, a baud rate outside the range the standard allows.
+- **An absent port is reported absent**, not as a transport failure. One is a
+  typo in a configuration file and the other is a cable; a caller that cannot
+  tell them apart cannot say anything useful to whoever is holding the cable.
+- **A handle that opens but is not a serial port is refused and released.**
+  Every operation afterwards fails, which is how we know it was let go rather
+  than kept half-configured.
+- **A closed port refuses work, and closing twice is safe.**
+
+What that leaves unverified is everything that touches the wire: whether
+`SetCommState` really applies 9600 8N1, whether the `MAXDWORD` read-interval
+timeout really makes reads return immediately, whether `PurgeComm` really
+discards, and whether a whole transaction survives the round trip.
+
+**How to close it.** With a com0com pair, or two USB adapters and a null-modem
+cable, name the pair and the full exchange runs:
+
+```
+set TSB_TEST_COM_PAIR=COM11,COM12
+ctest --test-dir build --output-on-failure
+```
+
+That test is written and in the repository; it skips, loudly, when the variable
+is unset. Anyone who runs it against real ports and reports the result closes
+a gap that CI cannot.
 
 ## The simulator
 

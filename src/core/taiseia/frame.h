@@ -98,4 +98,76 @@ result_t ts_parse_request(const uint8_t *buf, size_t len, ts_frame_t *out);
  */
 result_t ts_parse_response(const uint8_t *buf, size_t len, ts_frame_t *out);
 
+/* ------------------------------------------------- multi-byte data format --
+ *
+ * Appliances that report values wider than two bytes -- meters and sensors --
+ * use a longer header carrying the data type and item count that the general
+ * format has nowhere to put:
+ *
+ *     byte 0        packet length
+ *     byte 1        SA id
+ *     byte 2        bit 7 = write, bits 6..0 = service id
+ *     byte 3        reserved, 0xFF
+ *     byte 4..5     fragment number, big endian; 0 means this is the last
+ *     byte 6        data type code
+ *     byte 7..8     item count, big endian
+ *     byte 9..n-2   data
+ *     byte n-1      checksum
+ *
+ * Registration is NOT in this format even for these appliances: the standard
+ * keeps that exchange in the general shape for both directions.
+ */
+typedef struct {
+    uint8_t        sa_id;
+    uint8_t        service_id;
+    bool           write;
+    uint8_t        reserved;
+    uint16_t       fragment;
+    uint8_t        dtype;
+    uint16_t       count;
+    const uint8_t *data;
+    size_t         data_len;
+} ts_mb_frame_t;
+
+/**
+ * Build a multi-byte read request.
+ *
+ * The item count is 0xFFFF and the data field is one item wide with every byte
+ * 0xFF -- we are asking, not telling, and the appliance decides how many items
+ * come back. `value_len` is the type's width, from the data type table.
+ */
+result_t ts_build_mb_read(uint8_t *out, size_t cap, size_t *out_len,
+                          uint8_t sa_id, uint8_t service_id,
+                          uint8_t dtype, size_t value_len);
+
+/** Build a multi-byte write request carrying `count` items. */
+result_t ts_build_mb_write(uint8_t *out, size_t cap, size_t *out_len,
+                           uint8_t sa_id, uint8_t service_id,
+                           uint8_t dtype, uint16_t count,
+                           const uint8_t *data, size_t data_len);
+
+/**
+ * Decode a multi-byte reply. Validates length, the reserved byte's presence
+ * and the checksum. `out->data` aliases `buf`.
+ */
+result_t ts_parse_mb_response(const uint8_t *buf, size_t len,
+                              ts_mb_frame_t *out);
+
+/**
+ * The fragment number a reply carries, without decoding the rest of it.
+ *
+ * Where it lives depends on the format, and the caller knows which it asked
+ * for: byte 3 of a registration payload holds it in the high nibble, a
+ * multi-byte reply keeps it in bytes 4 and 5, and a general reply cannot
+ * fragment at all.
+ */
+typedef enum {
+    TS_REPLY_GENERAL = 0,
+    TS_REPLY_REGISTRATION,
+    TS_REPLY_MULTIBYTE
+} ts_reply_kind_t;
+
+result_t ts_reply_fragment(const uint8_t *buf, size_t len,
+                           ts_reply_kind_t kind, uint16_t *fragment);
+
 #endif /* TSB_CORE_TAISEIA_FRAME_H */

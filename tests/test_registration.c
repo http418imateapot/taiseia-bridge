@@ -20,6 +20,7 @@ static result_t registration_payload(sim_link_t *s, uint8_t *out, size_t cap,
 
     sim_link_bind(s, &l);
 
+    memset(&req, 0, sizeof(req));
     req.id = 1; req.op = LINK_OP_REGISTER; req.sa_id = 0;
     req.service_id = 0; req.value = 0;
 

@@ -11,6 +11,8 @@ int main(void)
 {
     test_json();
     test_frame();
+    test_frame_mb();
+    test_reassembly();
     test_datatype();
     test_registration();
     test_sim_link();
@@ -23,6 +25,7 @@ int main(void)
     test_uart();
     test_platform();
     test_serial_pty();
+    test_serial_win32();
 
     printf("%d checks, %d failures\n", g_checks, g_failures);
 

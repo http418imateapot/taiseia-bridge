@@ -156,3 +156,144 @@ result_t ts_parse_response(const uint8_t *buf, size_t len, ts_frame_t *out)
 
     return parse_common(buf, len, out, registration);
 }
+
+/* ------------------------------------------------- multi-byte data format --
+ *
+ * The header is fixed at nine bytes and the data field follows it, so the
+ * whole packet is TS_MB_OVERHEAD plus however much data there is.
+ */
+static result_t build_mb(uint8_t *out, size_t cap, size_t *out_len,
+                         uint8_t sa_id, uint8_t service_byte, uint8_t dtype,
+                         uint16_t count, const uint8_t *data, size_t data_len,
+                         uint8_t fill)
+{
+    size_t len = TS_MB_OVERHEAD + data_len;
+
+    if (!out || !out_len)
+        return RES_EINVAL;
+    if (len > TS_FRAME_MAX_LEN)
+        return RES_ETOOBIG;
+    if (cap < len)
+        return RES_ETOOBIG;
+
+    out[0] = (uint8_t)len;
+    out[1] = sa_id;
+    out[2] = service_byte;
+    out[3] = TS_MB_RESERVED;
+    out[4] = 0;                       /* fragment: we never send one */
+    out[5] = 0;
+    out[6] = dtype;
+    out[7] = (uint8_t)((count >> 8) & 0xFFu);
+    out[8] = (uint8_t)(count & 0xFFu);
+
+    if (data)
+        memcpy(&out[TS_MB_DATA_OFFSET], data, data_len);
+    else
+        memset(&out[TS_MB_DATA_OFFSET], fill, data_len);
+
+    out[len - 1u] = ts_checksum(out, len - 1u);
+
+    *out_len = len;
+    return RES_OK;
+}
+
+result_t ts_build_mb_read(uint8_t *out, size_t cap, size_t *out_len,
+                          uint8_t sa_id, uint8_t service_id,
+                          uint8_t dtype, size_t value_len)
+{
+    if (service_id > TS_SVC_ID_MAX)
+        return RES_EINVAL;
+    /* A read still carries a data field, one item wide, every byte 0xFF. A
+     * zero-width type has no such field to describe and cannot be asked for
+     * this way. */
+    if (value_len == 0 || value_len > TS_DATA_MAX)
+        return RES_EINVAL;
+
+    return build_mb(out, cap, out_len, sa_id,
+                    (uint8_t)(service_id & TS_SVC_ID_MASK), dtype,
+                    (uint16_t)TS_MB_COUNT_UNSPECIFIED, NULL, value_len,
+                    TS_READ_FILL);
+}
+
+result_t ts_build_mb_write(uint8_t *out, size_t cap, size_t *out_len,
+                           uint8_t sa_id, uint8_t service_id,
+                           uint8_t dtype, uint16_t count,
+                           const uint8_t *data, size_t data_len)
+{
+    if (service_id > TS_SVC_ID_MAX)
+        return RES_EINVAL;
+    if (!data || data_len == 0 || data_len > TS_DATA_MAX)
+        return RES_EINVAL;
+
+    return build_mb(out, cap, out_len, sa_id,
+                    (uint8_t)((service_id & TS_SVC_ID_MASK) |
+                              TS_SVC_WRITE_BIT),
+                    dtype, count, data, data_len, 0);
+}
+
+result_t ts_parse_mb_response(const uint8_t *buf, size_t len,
+                              ts_mb_frame_t *out)
+{
+    size_t   declared;
+    result_t r;
+
+    if (!buf || !out)
+        return RES_EINVAL;
+
+    memset(out, 0, sizeof(*out));
+
+    r = ts_frame_declared_len(buf, len, &declared);
+    if (r != RES_OK)
+        return r;
+    if (declared != len)
+        return RES_EFORMAT;
+
+    /* Shorter than the header cannot be this format, whatever it is. */
+    if (len < TS_MB_OVERHEAD)
+        return RES_EFORMAT;
+
+    if (ts_checksum(buf, len - 1u) != buf[len - 1u])
+        return RES_EFORMAT;
+
+    out->sa_id      = buf[1];
+    out->service_id = (uint8_t)(buf[2] & TS_SVC_ID_MASK);
+    out->write      = (buf[2] & TS_SVC_WRITE_BIT) != 0;
+    out->reserved   = buf[3];
+    out->fragment   = (uint16_t)(((uint16_t)buf[4] << 8) | buf[5]);
+    out->dtype      = buf[6];
+    out->count      = (uint16_t)(((uint16_t)buf[7] << 8) | buf[8]);
+    out->data       = &buf[TS_MB_DATA_OFFSET];
+    out->data_len   = len - TS_MB_OVERHEAD;
+
+    return RES_OK;
+}
+
+result_t ts_reply_fragment(const uint8_t *buf, size_t len,
+                           ts_reply_kind_t kind, uint16_t *fragment)
+{
+    if (!buf || !fragment)
+        return RES_EINVAL;
+
+    switch (kind) {
+    case TS_REPLY_MULTIBYTE:
+        if (len < TS_MB_OVERHEAD)
+            return RES_EFORMAT;
+        *fragment = (uint16_t)(((uint16_t)buf[4] << 8) | buf[5]);
+        return RES_OK;
+
+    case TS_REPLY_REGISTRATION:
+        /* Payload byte 3 shares its byte with the link speed: the fragment
+         * number is the high nibble. The payload starts at byte 2, so that is
+         * byte 5 of the packet. */
+        if (len < 6u)
+            return RES_EFORMAT;
+        *fragment = (uint16_t)((buf[5] >> 4) & 0x0Fu);
+        return RES_OK;
+
+    case TS_REPLY_GENERAL:
+    default:
+        /* A general reply is six bytes and has nowhere to put one. */
+        *fragment = 0;
+        return RES_OK;
+    }
+}

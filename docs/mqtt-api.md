@@ -1,8 +1,8 @@
 # MQTT API
 
-> Topic rendering, payload construction and the MQTT codec are built and
-> tested. The client that opens a socket and drives them is not. See
-> [architecture.md §8](architecture.md).
+> Everything on this page is built, and exercised against a real mosquitto by
+> `scripts/integration-broker.sh`. What has *not* been exercised is a real
+> appliance behind it -- see [testing.md](testing.md).
 
 ## 1. Topics
 
@@ -11,14 +11,26 @@ defaults:
 
 | Purpose | Default template | Direction |
 |---|---|---|
-| `topic_telemetry` | `{prefix}/from/device/{id}/telemetry` | published |
-| `topic_capabilities` | `{prefix}/from/device/{id}/capabilities` | published, retained |
-| `topic_status` | `{prefix}/from/device/{id}/status` | published, retained, also the will |
-| `topic_control` | `{prefix}/to/device/{id}/control` | subscribed |
-| `topic_ack` | `{prefix}/from/device/{id}/control/acknowledgement` | published |
+| `topic_telemetry` | `{prefix}/from/appliance/{id}/telemetry` | published |
+| `topic_capabilities` | `{prefix}/from/appliance/{id}/capabilities` | published, retained |
+| `topic_status` | `{prefix}/from/appliance/{id}/status` | published, retained, also the will |
+| `topic_command` | `{prefix}/to/appliance/{id}/command` | subscribed |
+| `topic_ack` | `{prefix}/from/appliance/{id}/command/ack` | published |
+
+`topic_prefix` defaults to **`taiseia101/v1`**. The version sits *under* the
+protocol name because what it versions is this bridge's payload schema, not a
+system-wide contract -- see [adr/0007](adr/0007-topic-templates.md).
+
+`from` and `to` are written from the consumer's side: `to` is what you send.
+The whole `from/appliance/{id}` subtree means *about* appliance `{id}`, not
+*spoken by* it -- the acknowledgement is the bridge's verdict, and two of its
+outcomes (`read_only`, `unknown`) are settled without touching the wire at all.
 
 All five are rendered and checked at startup: each must fit, and no two may be
-equal. See [adr/0007](adr/0007-topic-templates.md).
+equal. A rendered topic has 160 bytes; with the defaults that leaves 119 for
+the device identifier, which is far more than the 23 an MQTT client identifier
+is guaranteed to be allowed. Too long is reported as such, and says which of
+the two to shorten.
 
 Capabilities and status are retained because a subscriber that joins late needs
 them to interpret anything else. Telemetry is not: a retained sample is a stale
@@ -42,7 +54,10 @@ tables, which are not in this repository — see
   "attributes": {
     "0":  1,
     "7": 62,
-    "21": 45                  // a bit type: the raw value, not expanded
+    "21": 45,                 // a bit type: the raw value, not expanded
+    "32": -2,                 // multi-byte, signed by its declared type
+    "33": [10, 11, 12],       // multi-byte, a batch of readings
+    "34": "07e80c0c0e1e"      // multi-byte, a width this cannot decode
   }
 }
 ```
@@ -51,12 +66,32 @@ tables, which are not in this repository — see
 Reports keep going out on schedule either way: going silent would leave a
 consumer unable to tell a detached appliance from a dead bridge.
 
-**Values are unsigned decimal today**, because every service that can currently
-be polled uses the general format, which carries no data type — so nothing on
-the wire says whether a value is signed. The decoder can sign-extend and is
-tested doing so; there is simply nothing yet that tells it to. When multi-byte
-polling arrives, its type codes will, and a value may then also be an array or
-a string. Consumers should tolerate that widening.
+**A value has four shapes, and which one you get depends on the appliance's
+record format.** Consumers have to tolerate all four.
+
+| shape | when | example |
+|---|---|---|
+| unsigned number | general format, always | `62` |
+| number | multi-byte, one item of a width this can decode | `-2`, `1234` |
+| array of numbers | multi-byte, several items | `[10, 11, 12]` |
+| hex string | multi-byte, a width this cannot decode | `"07e80c0c0e1e"` |
+
+A general-format record carries **no data type**, so nothing on the wire says
+whether its value is signed and it goes out unsigned. The decoder can
+sign-extend and is tested doing so; in that format there is simply nothing to
+tell it to.
+
+A multi-byte record does carry a type, and it is published with the
+capabilities rather than repeated on every reading -- so a consumer that needs
+to know whether `3` is a count or a bit mask looks it up in section 4. One,
+two, four and eight-byte integers become JSON numbers, signed when the type
+says so. Everything else -- a six-byte timestamp, a composite -- goes out as
+lowercase hex of the bytes as they arrived, because a guess at its meaning
+would be worse than an honest dump.
+
+A multi-byte read asks the appliance for what it has rather than for a fixed
+number of items, so a meter answering with a batch of samples is normal and not
+an edge case. That is the array shape.
 
 ## 4. Capabilities
 
@@ -156,12 +191,13 @@ adds a **sibling** object, leaving `attributes` unchanged in shape:
 "attribute_bits":  { "21": [1,0,1,1,0,1,0,0, 0,0,0,0,0,0,0,0] }
 ```
 
-Default off.
+Default off. **Not implemented yet**: the setting is accepted and validated,
+and nothing reads it. Turning it on changes nothing about what is published.
 
 ## 6. Control and acknowledgement
 
 ```jsonc
-// inbound on topic_control
+// inbound on topic_command
 { "tag": 1, "attributes": { "3": 70 } }
 ```
 
