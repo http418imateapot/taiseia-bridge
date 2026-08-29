@@ -1,9 +1,10 @@
 # taiseia-bridge
 
-A TaiSEIA 101 (CNS 16014) appliance link with an MQTT northbound, in portable C99.
+A TaiSEIA 101 (CNS 16014) appliance link with an MQTT northbound, in portable
+C99.
 
-The bridge takes the **HNA role** defined by the standard: it is the requester on
-a point-to-point UART link to a smart appliance (SA), reads the appliance's
+The program takes the **HNA role** defined by the standard: it is the requester
+on a point-to-point UART link to a smart appliance (SA), reads the appliance's
 capabilities and operating state, accepts control commands, and publishes
 everything to an MQTT broker.
 
@@ -11,24 +12,33 @@ everything to an MQTT broker.
         MQTT broker
              ▲
              │  configurable topic templates, JSON payloads
-      ┌──────┴───────┐
-      │ taiseia-bridge│   ← HNA role
-      └──────┬───────┘
+      ┌──────┴────────┐
+      │ taiseia-bridge │   ← HNA role
+      └──────┬────────┘
              │  UART 9600 8N1, request/response, half duplex
         [ appliance (SA) ]
 ```
 
-It runs on a Linux box, a Windows PC with a USB-UART adapter, or an embedded
-Linux target. No external libraries: standard C99 plus what the platform
-already provides.
+It is meant to run on a Linux box, on a Windows PC with a USB-to-UART adapter,
+or on an embedded Linux target. No external libraries at run time: standard C99
+plus what the platform already provides.
 
 ---
 
-## Status
+## Status — early development
 
-**Early development. Nothing here has been verified against a physical
-appliance.** Verification is against a built-in simulator and against test
-vectors derived from the standard. See [docs/testing.md](docs/testing.md).
+| | |
+|---|---|
+| Packet framing, checksums, data types | built, tested |
+| Appliance link port and simulator | built, tested |
+| Registration decoding, capability model | not started |
+| MQTT, configuration, the applications | not started |
+| Serial adapters (POSIX, Windows) | not started |
+
+**No physical appliance has ever been connected to this code.** Verification is
+by CI — Linux with AddressSanitizer and UBSan, Linux release, and MSVC — and by
+a simulator that encodes and decodes real packets. Neither is evidence about
+real hardware. See [docs/testing.md](docs/testing.md).
 
 ---
 
@@ -37,33 +47,42 @@ vectors derived from the standard. See [docs/testing.md](docs/testing.md).
 Payloads carry **raw TaiSEIA service identifiers and values**. Nothing here
 translates service id `3` into a name, or value `1` into `"on"`.
 
-That is not an omission. Capabilities — including each service's data type and
-its supported range or bit mask — are **queried from the appliance at run time**
-using the standard's registration function. Interpreting what a service *means*
-requires the per-appliance service tables in CNS 16014 Annex A, which are
-licensed material. Consumers apply their own copy.
+That is not an omission. Capabilities — each service's access direction, data
+type, and supported range or bit mask — are **queried from the appliance at run
+time** through the standard's registration exchange. Interpreting what a service
+*means* requires the per-appliance service tables in CNS 16014 Annex A, which
+are licensed material. Consumers apply their own copy.
 
-The practical benefit: a new appliance type needs no firmware change here.
+The practical benefit: a new appliance type needs no change here.
+
+See [ADR 0003](docs/adr/0003-no-service-tables.md).
 
 ---
 
 ## Building
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
+cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 ```
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-## Running against the simulator
+---
 
-No hardware required.
+## Documentation
 
-```bash
-./build/taiseia-bridge --link sim --config examples/config/simulator.conf
-```
+| | |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | layers, the two seams, why concurrency is not in the core |
+| [docs/mqtt-api.md](docs/mqtt-api.md) | topic templates and payload schema |
+| [docs/porting.md](docs/porting.md) | adding a platform, a protocol, or a concurrency model |
+| [docs/testing.md](docs/testing.md) | what is verified, and what is not |
+| [docs/adr/](docs/adr) | the decisions, each with the alternatives it rejected |
+| [AGENTS.md](AGENTS.md) | instructions for coding agents |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | style, tests, pull requests |
+| [SECURITY.md](SECURITY.md) | reporting, and the accepted limitations |
 
 ---
 
@@ -71,5 +90,6 @@ No hardware required.
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-This project is not certified, endorsed, or verified by any standards body, and
-makes no claim of conformance to CNS 16014 or CNS 16090.
+Written from the published standard; no code from any other implementation is
+incorporated. This project is not certified, endorsed, or verified by any
+standards body, and makes no claim of conformance to CNS 16014 or CNS 16090.

@@ -11,25 +11,27 @@ jobs:
     name: linux / gcc / asan+ubsan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DTSB_SANITIZE=ON
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DTSB_SANITIZE=ON -DTSB_WERROR=ON
 
       - name: build
         run: cmake --build build --parallel
 
+      # -V so the assertion count reaches the log. A test suite that passes
+      # because it asserted nothing looks identical to one that passes.
       - name: test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure -V
 
   linux-release:
     name: linux / gcc / release, no sanitizers
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DTSB_SANITIZE=OFF
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DTSB_SANITIZE=OFF -DTSB_WERROR=ON
 
       - name: build
         run: cmake --build build --parallel
@@ -41,10 +43,10 @@ jobs:
     name: windows / msvc
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: configure
-        run: cmake -B build -DTSB_SANITIZE=OFF
+        run: cmake -B build -DTSB_SANITIZE=OFF -DTSB_WERROR=ON
 
       - name: build
         run: cmake --build build --config Debug

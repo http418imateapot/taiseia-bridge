@@ -13,16 +13,29 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(TSB_BUILD_TESTS "Build the host unit tests" ON)
 option(TSB_SANITIZE    "Build with AddressSanitizer and UBSan where available" ON)
+option(TSB_WERROR      "Treat warnings as errors" OFF)
 
 # ------------------------------------------------------------------ warnings
+#
+# TSB_WERROR is off by default and on in CI. A warning that survives one commit
+# survives all of them, so the gate belongs somewhere it cannot be skipped --
+# but a contributor on a newer compiler should not be blocked by a diagnostic
+# that did not exist when the code was written.
+#
 add_library(tsb_warnings INTERFACE)
 if(MSVC)
     target_compile_options(tsb_warnings INTERFACE /W4)
+    if(TSB_WERROR)
+        target_compile_options(tsb_warnings INTERFACE /WX)
+    endif()
 else()
     target_compile_options(tsb_warnings INTERFACE
         -Wall -Wextra -Wsign-compare -Wshadow -Wpointer-arith -Wcast-align
         -Wstrict-prototypes -Wmissing-prototypes -Wold-style-definition
         -Wwrite-strings -Wformat=2)
+    if(TSB_WERROR)
+        target_compile_options(tsb_warnings INTERFACE -Werror)
+    endif()
 endif()
 
 # ---------------------------------------------------------------- sanitizers

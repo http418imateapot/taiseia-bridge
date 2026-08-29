@@ -248,6 +248,11 @@ static void the_dispatcher_tolerates_a_null_link(void)
     link_resp_t resp;
     link_t      empty;
 
+    /* Nothing here should read either struct, but leaving them indeterminate
+     * makes that an assumption rather than a fact. */
+    memset(&req, 0, sizeof(req));
+    memset(&resp, 0, sizeof(resp));
+
     empty.vt   = NULL;
     empty.self = NULL;
 
