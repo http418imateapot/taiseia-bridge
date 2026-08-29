@@ -34,7 +34,8 @@ plus what the platform already provides.
 | Registration and capability decoding | built, tested |
 | Appliance model, sweep scheduling, writes | built, tested |
 | MQTT codec, topics, payloads, configuration | built, tested |
-| MQTT client, socket port, the applications | not started |
+| MQTT client, socket port | built, tested |
+| Platform adapters (sockets, serial), the applications | not started |
 | Serial adapters (POSIX, Windows) | not started |
 
 **No physical appliance has ever been connected to this code.** Verification is
