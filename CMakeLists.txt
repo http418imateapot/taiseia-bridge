@@ -72,7 +72,9 @@ add_library(tsb_core STATIC
     src/core/mqtt/payload.c
     src/core/mqtt/config.c
     src/core/mqtt/codec.c
-    src/ports/appliance_link.c)
+    src/core/mqtt/client.c
+    src/ports/appliance_link.c
+    src/ports/socket.c)
 target_include_directories(tsb_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tsb_core PRIVATE tsb_warnings)
 
@@ -95,7 +97,8 @@ if(TSB_BUILD_TESTS)
         tests/test_appliance.c
         tests/test_payload.c
         tests/test_config.c
-        tests/test_mqtt.c)
+        tests/test_mqtt.c
+        tests/test_client.c)
     target_include_directories(tsb_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_link_libraries(tsb_tests PRIVATE tsb_sim tsb_warnings)
 
