@@ -138,6 +138,7 @@ if(TSB_BUILD_TESTS)
         tests/test_mqtt.c
         tests/test_client.c
         tests/test_platform.c
+        tests/test_serial_pty.c
         tests/test_uart.c
         tests/test_control.c)
     target_include_directories(tsb_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)

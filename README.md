@@ -40,10 +40,12 @@ plus what the platform already provides.
 | The two applications | built, smoke-tested |
 | Serial adapters (POSIX, Windows) | not started |
 
-**No physical appliance has ever been connected to this code.** Verification is
-by CI — Linux with AddressSanitizer and UBSan, Linux release, and MSVC — and by
-a simulator that encodes and decodes real packets. Neither is evidence about
-real hardware. See [docs/testing.md](docs/testing.md).
+**No physical appliance has ever been connected to this code**, and no real
+broker. Verification is by CI — Linux with AddressSanitizer and UBSan, Linux
+release, and MSVC — by a simulator that encodes and decodes real packets, by
+real loopback sockets on both platforms, and by a real serial device on POSIX.
+None of that is evidence about an actual appliance.
+See [docs/testing.md](docs/testing.md).
 
 ---
 

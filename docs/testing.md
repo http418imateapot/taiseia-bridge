@@ -6,7 +6,7 @@ Everything in `src/core` and `src/adapters/sim`, on every push, by CI:
 
 | Job | What it adds |
 |---|---|
-| linux / gcc / asan+ubsan | AddressSanitizer and UBSan, non-recovering; warnings are errors |
+| linux / gcc / asan+ubsan | AddressSanitizer and UBSan, non-recovering; warnings are errors; the pseudo-terminal tests |
 | linux / gcc / release | optimised build, no sanitizers — different code, different bugs |
 | windows / msvc | a second compiler and a second standard library |
 
@@ -39,8 +39,9 @@ establishes that:
 - a USB-to-UART adapter meets the 30 ms inter-byte ceiling on any particular
   operating system;
 - any specific device's registration payload parses;
-- the serial adapters work at all -- nothing in CI opens a serial port, so
-  they are exercised only through the port interface by a fake;
+- the **Windows** serial adapter works at all -- nothing in CI can open a
+  serial port there, so it is exercised only through the port interface by a
+  fake. The POSIX one is now driven through a real device (below);
 - the MQTT client can talk to a real broker;
 - the protocol has been read correctly at all.
 
@@ -50,6 +51,33 @@ misread identically in the other, and the tests pass. Building genuine packets
 on both sides narrows the gap — a framing error that only one side makes will
 show up — but agreement between two things derived from one reading is not
 evidence about the wire.
+
+## The pseudo-terminal tests
+
+On POSIX, `tests/test_serial_pty.c` opens a real serial device and drives the
+adapter through it.
+
+A pseudo-terminal is a real tty: it has a line discipline, it echoes by
+default, and it will translate carriage returns if you let it. That is what
+makes it the right stand-in -- not that it resembles a USB adapter
+electrically, but that it has all the same ways of quietly corrupting a binary
+protocol, and turning those off is precisely what the adapter's setup code is
+for.
+
+What this reaches and a fake cannot:
+
+- **Echo is off.** Left on, every byte we wrote would come back as though the
+  appliance had said it, and every reply after that would be read at the wrong
+  offset.
+- **0x0D, 0x0A, 0x03 and 0x1A pass through untouched.** In cooked mode the
+  first would arrive as the second, and the third would raise a signal.
+- **A whole exchange over the device**, with an appliance played by the other
+  end of the pair.
+- **A silent peer times out on the protocol's schedule**, measured against a
+  real clock.
+
+Windows has no equivalent that can be opened in CI, so its serial adapter
+remains the least-verified thing in the project.
 
 ## The simulator
 
