@@ -431,6 +431,11 @@ result_t mqttc_publish(mqtt_client_t *c, const char *topic,
     if (c->state != MQTTC_READY)
         return RES_EIO;
 
+    /* Past the declared ceiling it will never be publishable, and telling the
+     * caller to try again later would have it try forever. */
+    if (len > MQTT_PAYLOAD_MAX)
+        return RES_ETOOBIG;
+
     /*
      * Room for THIS packet, not for the largest one imaginable.
      *

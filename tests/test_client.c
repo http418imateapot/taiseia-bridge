@@ -536,16 +536,20 @@ static void a_busy_send_buffer_refuses_rather_than_grows(void)
     mqtt_client_t c;
     fake_sock_t   f;
     socket_t      s;
-    static uint8_t big[MQTT_PAYLOAD_MAX];
+    static uint8_t big[MQTT_PAYLOAD_MAX + 8u];
 
     bring_up(&c, &f, &s);
     f.send_limit = 1;                    /* nothing will drain this tick */
 
     memset(big, 'x', sizeof(big));
-    CHECK_EQ(mqttc_publish(&c, "a/b", big, sizeof(big), false), RES_OK);
-    CHECK_EQ(mqttc_publish(&c, "a/b", big, sizeof(big), false), RES_EBUSY);
+    CHECK_EQ(mqttc_publish(&c, "a/b", big, MQTT_PAYLOAD_MAX, false), RES_OK);
+    CHECK_EQ(mqttc_publish(&c, "a/b", big, MQTT_PAYLOAD_MAX, false),
+             RES_EBUSY);
 
-    /* And a payload larger than the buffer will never fit, whatever drains. */
+    /*
+     * Past the ceiling is a different answer from busy: it will never be
+     * publishable, and "try again later" would have the caller try forever.
+     */
     CHECK_EQ(mqttc_publish(&c, "a/b", big, MQTT_PAYLOAD_MAX + 1u, false),
              RES_ETOOBIG);
 }
