@@ -1,7 +1,8 @@
 # MQTT API
 
-> Not implemented yet. This is the agreed contract; the northbound side is not
-> built. See [architecture.md §8](architecture.md).
+> Topic rendering, payload construction and the MQTT codec are built and
+> tested. The client that opens a socket and drives them is not. See
+> [architecture.md §8](architecture.md).
 
 ## 1. Topics
 
@@ -40,21 +41,22 @@ tables, which are not in this repository — see
   "online":      true,
   "attributes": {
     "0":  1,
-    "3":  -3,                 // INT8, sign-extended from two's complement
-    "21": 45,                 // a bit type: the raw value, not expanded
-    "64": [12, 34, 56],       // a multi-element service
-    "5":  "ABC-123"           // a string service
+    "7": 62,
+    "21": 45                  // a bit type: the raw value, not expanded
   }
 }
 ```
 
-An attribute value is an **integer, an array of integers, or a string**.
-Consumers must tolerate all three; which one appears is determined by the
-service's data type, published in capabilities.
+`sa_id` is `null` and `attributes` is empty when the appliance is offline.
+Reports keep going out on schedule either way: going silent would leave a
+consumer unable to tell a detached appliance from a dead bridge.
 
-Negative values are decoded as signed where the data type says so. Reading
-everything as unsigned turns −3 into 65533 with no outward sign of a problem,
-which is why it is called out here and tested explicitly.
+**Values are unsigned decimal today**, because every service that can currently
+be polled uses the general format, which carries no data type — so nothing on
+the wire says whether a value is signed. The decoder can sign-extend and is
+tested doing so; there is simply nothing yet that tells it to. When multi-byte
+polling arrives, its type codes will, and a value may then also be an array or
+a string. Consumers should tolerate that widening.
 
 ## 4. Capabilities
 
@@ -132,6 +134,10 @@ why §4.2 cannot simply pick one of the two.
 
 ## 5. Bit fields are not expanded
 
+> `expand_bitfields` is accepted in configuration but does nothing yet: knowing
+> which services are bit-typed needs the data type code, which the general
+> format does not carry.
+
 A bit-typed value is published as its raw integer. The bridge does not emit
 `["cool", "dry"]`, for three reasons:
 
@@ -161,26 +167,37 @@ Default off.
 
 ```jsonc
 // outbound on topic_ack
-{ "success": true, "tag": 1, "device_id": "...", "device_time": "...",
-  "results": { "3": 0 } }
+{ "success": false, "tag": 1, "device_id": "...", "device_time": "...",
+  "results": { "3": "ok", "7": "read_only" } }
 ```
+
+`success` is true only when every item was written.
 
 `tag` is echoed back byte for byte, whatever its JSON type, so a consumer may
 correlate however it likes.
 
-The numbers in `results` come from a **configurable mapping**, because the
-device protocol has no write result codes of its own -- success there is
-defined as the appliance replying with a packet identical to the request. The
-model reports what it observed; the mapping turns that into whatever a
-particular backend expects:
+The device protocol has **no write result codes at all**: success there is
+defined as the appliance replying with a packet identical to the request, and
+nothing is said about what a differing reply means. So there is no numbering to
+inherit, and this project declines to invent one. The default is the outcome's
+name, which needs no lookup table:
 
-| Model outcome | Meaning | Example mapping |
+| Outcome | Established by | Costs a round trip |
 |---|---|---|
-| `ok` | the reply matched the request byte for byte | `0` |
-| `not_taken` | the appliance replied with a different value | `240` |
-| `read_only` | declared read-only in the capability set | `255` |
-| `unknown` | not in the capability set at all | `255` |
-| `no_reply` | timed out or the transport failed | `255` |
+| `ok` | the reply matched the request byte for byte | yes |
+| `not_taken` | the appliance replied with a different value | yes |
+| `read_only` | declared read-only in the capability set | no |
+| `unknown` | not in the capability set at all | no |
+| `no_reply` | timed out, or the transport failed | — |
+
+A backend that expects particular numbers gets them from configuration, in the
+order above:
+
+```
+write_result_codes = 0,255,255,240,255
+```
+
+which turns the example into `"results": { "3": 0, "7": 255 }`.
 
 `not_taken` deliberately does not claim "out of range". A differing echo is
 equally consistent with the appliance rounding the value, refusing it, or being

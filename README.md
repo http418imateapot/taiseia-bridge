@@ -33,7 +33,8 @@ plus what the platform already provides.
 | Appliance link port and simulator | built, tested |
 | Registration and capability decoding | built, tested |
 | Appliance model, sweep scheduling, writes | built, tested |
-| MQTT, configuration, the applications | not started |
+| MQTT codec, topics, payloads, configuration | built, tested |
+| MQTT client, socket port, the applications | not started |
 | Serial adapters (POSIX, Windows) | not started |
 
 **No physical appliance has ever been connected to this code.** Verification is
