@@ -23,7 +23,14 @@
 /* length(1) + SA id(1) + service byte(1) + checksum(1) */
 #define TS_FRAME_OVERHEAD       4u
 
-#define TS_DATA_MAX             (TS_FRAME_MAX_LEN - TS_FRAME_OVERHEAD)
+/* A registration reply has no service byte, so its payload starts one byte
+ * earlier and is one byte longer than any other reply of the same size. */
+#define TS_REG_FRAME_OVERHEAD   3u
+
+/* Sized for the longest data field any reply can carry, which is the
+ * registration case. Sizing this from TS_FRAME_OVERHEAD instead would be one
+ * byte short, and short by exactly the packet that matters most. */
+#define TS_DATA_MAX             (TS_FRAME_MAX_LEN - TS_REG_FRAME_OVERHEAD)
 
 /* A general-data-format request is always exactly this long: the two data
  * bytes are present whether or not the operation carries a value. */
@@ -77,5 +84,8 @@ TS_STATIC_ASSERT(TS_FRAME_MAX_LEN < 255u,                max_len_reserves_ff);
 TS_STATIC_ASSERT(TS_GENERAL_REQ_LEN >= TS_FRAME_MIN_LEN, general_req_is_valid);
 TS_STATIC_ASSERT(TS_DATA_MAX > 0,                        data_max_positive);
 TS_STATIC_ASSERT((TS_SVC_ID_MASK & TS_SVC_WRITE_BIT) == 0, service_byte_split);
+TS_STATIC_ASSERT(TS_REG_FRAME_OVERHEAD < TS_FRAME_OVERHEAD,  reg_has_no_svc_byte);
+TS_STATIC_ASSERT(TS_DATA_MAX >= TS_FRAME_MAX_LEN - TS_FRAME_OVERHEAD,
+                                                             data_max_covers_all);
 
 #endif /* TSB_CORE_TAISEIA_LIMITS_H */

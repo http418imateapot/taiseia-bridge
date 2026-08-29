@@ -11,6 +11,10 @@
  * what stops the framing layer from being exercised only by tests written
  * against itself.
  *
+ * The same applies to registration: the simulator assembles a real reply
+ * payload out of its configured identity and services, so the decoder is
+ * tested against bytes rather than against a struct someone filled in.
+ *
  * It is also where faults are injected. Timeouts and corrupted checksums are
  * rare and unrepeatable on real hardware, so they are made deliberate here.
  */
@@ -18,6 +22,7 @@
 #define TSB_ADAPTERS_SIM_LINK_H
 
 #include "core/taiseia/limits.h"
+#include "core/taiseia/registration.h"
 #include "core/util/result.h"
 #include "ports/appliance_link.h"
 
@@ -27,24 +32,35 @@
 
 typedef struct {
     uint8_t  service_id;
-    uint8_t  dtype;       /* a code from core/taiseia/datatype.h           */
+    uint8_t  dtype;       /* a code from core/taiseia/datatype.h;
+                             ignored in the general record format          */
     bool     writable;
     uint16_t value;
-    uint16_t support_hi;  /* minimum, for a range type                    */
-    uint16_t support_lo;  /* maximum, or the mask for a bit type          */
+    uint8_t  support[TS_SUPPORT_MAX_BYTES];
+    size_t   support_len;
 } sim_service_t;
 
 typedef struct {
-    uint8_t       sa_id;
+    /* --- identity, reported at registration --- */
+    ts_format_t   format;
+    uint8_t       device_class;
+    uint8_t       proto_major;
+    uint8_t       proto_minor;
+    uint8_t       baud_code;
+    uint16_t      sa_id;
+    char          make[TS_STRING_MAX + 1u];
+    char          model[TS_STRING_MAX + 1u];
+
     size_t        n_services;
     sim_service_t services[TS_MAX_CAPABILITIES];
 
-    /* Answered verbatim for LINK_OP_REGISTER. The registration payload
-     * layout is decoded elsewhere; the simulator only has to deliver it. */
-    uint8_t       reg_blob[TS_DATA_MAX];
-    size_t        reg_blob_len;
+    /* When set, returned verbatim instead of an assembled payload. For
+     * driving the decoder's refusals with bytes it should reject. */
+    bool          raw_registration;
+    uint8_t       raw[TS_DATA_MAX];
+    size_t        raw_len;
 
-    /* Fault injection. */
+    /* --- fault injection --- */
     unsigned      drop_next;      /* silently swallow this many requests   */
     bool          corrupt_next;   /* damage the next reply's checksum      */
 
@@ -53,17 +69,32 @@ typedef struct {
     link_resp_t   pending;
 } sim_link_t;
 
-/** Reset to an appliance of type `sa_id` with no services. */
-void sim_link_init(sim_link_t *s, uint8_t sa_id);
+/**
+ * Reset to a general-format home appliance of type `sa_id`, with no services.
+ * Make and model default to placeholders; override with sim_link_set_identity.
+ */
+void sim_link_init(sim_link_t *s, uint16_t sa_id);
 
-/** Add one service. RES_ETOOBIG past TS_MAX_CAPABILITIES. */
+/** Set what the appliance reports about itself. Strings are truncated to fit. */
+result_t sim_link_set_identity(sim_link_t *s, ts_format_t format,
+                               uint8_t device_class, uint16_t sa_id,
+                               const char *make, const char *model);
+
+/**
+ * Add one service.
+ *
+ * `support` is the support datum exactly as it goes on the wire. In the
+ * general record format it must be two bytes; in the multi-byte format it must
+ * match the width the type code implies, which is what the decoder will
+ * expect. RES_EINVAL if it does not.
+ */
 result_t sim_link_add_service(sim_link_t *s, uint8_t service_id, uint8_t dtype,
                               bool writable, uint16_t value,
-                              uint16_t support_hi, uint16_t support_lo);
+                              const uint8_t *support, size_t support_len);
 
-/** Set the bytes returned for a registration request. */
-result_t sim_link_set_registration(sim_link_t *s, const uint8_t *blob,
-                                   size_t len);
+/** Return `blob` verbatim for a registration request, bypassing assembly. */
+result_t sim_link_set_raw_registration(sim_link_t *s, const uint8_t *blob,
+                                       size_t len);
 
 /** Point `out` at this simulator. */
 void sim_link_bind(sim_link_t *s, link_t *out);
@@ -74,7 +105,7 @@ void sim_link_drop_next(sim_link_t *s, unsigned n);
 /** Damage the checksum of the next reply. */
 void sim_link_corrupt_next(sim_link_t *s);
 
-/** Take the link down, as a cable pull would. */
+/** Take the link down, as a pulled cable would. */
 void sim_link_set_down(sim_link_t *s);
 
 #endif /* TSB_ADAPTERS_SIM_LINK_H */

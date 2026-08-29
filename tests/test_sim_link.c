@@ -8,12 +8,18 @@
 #include "core/taiseia/datatype.h"
 #include "ports/appliance_link.h"
 
-/* An appliance with one read-only and one writable service. */
+/* Support data as it appears on the wire: two bytes in the general format. */
+static const uint8_t k_sup_bits[]  = { 0x00, 0x03 };   /* modes 0 and 1     */
+static const uint8_t k_sup_range[] = { 0x00, 0x64 };   /* minimum 0, max 100 */
+
+/* An appliance with one writable and one read-only service. */
 static void build(sim_link_t *s, link_t *l)
 {
     sim_link_init(s, 0x04);
-    CHECK_EQ(sim_link_add_service(s, 0x00, 0x01, true,  1, 0, 0x0003), RES_OK);
-    CHECK_EQ(sim_link_add_service(s, 0x07, 0x21, false, 62, 0, 100),   RES_OK);
+    CHECK_EQ(sim_link_add_service(s, 0x00, 0x01, true, 1,
+                                  k_sup_bits, sizeof(k_sup_bits)), RES_OK);
+    CHECK_EQ(sim_link_add_service(s, 0x07, 0x21, false, 62,
+                                  k_sup_range, sizeof(k_sup_range)), RES_OK);
     sim_link_bind(s, l);
 }
 
@@ -198,25 +204,49 @@ static void a_down_link_refuses_work(void)
     CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
 }
 
-static void registration_returns_the_configured_bytes(void)
+/*
+ * A registration reply carries SA id 0x00 in the frame -- the appliance type
+ * lives inside the payload instead. Decoding that payload is
+ * test_registration.c; here we only establish that the frame is shaped right.
+ */
+static void a_registration_reply_is_framed_as_one(void)
 {
-    sim_link_t    s;
-    link_t        l;
-    link_req_t    req;
-    link_resp_t   resp;
-    const uint8_t blob[] = { 0x04, 0x01, 0x00, 0x21 };
+    sim_link_t  s;
+    link_t      l;
+    link_req_t  req;
+    link_resp_t resp;
 
     build(&s, &l);
-    CHECK_EQ(sim_link_set_registration(&s, blob, sizeof(blob)), RES_OK);
 
     req.id = 40; req.op = LINK_OP_REGISTER; req.sa_id = 0x04;
     req.service_id = 0x00; req.value = 0;
 
     CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
     CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(resp.sa_id, 0x00);
+    CHECK(resp.data_len > TS_REG_HEADER_LEN);
+    CHECK_EQ(resp.data[0], TS_CLASS_APPLIANCE);   /* general format */
+}
+
+static void a_raw_registration_overrides_the_assembled_one(void)
+{
+    sim_link_t    s;
+    link_t        l;
+    link_req_t    req;
+    link_resp_t   resp;
+    const uint8_t blob[] = { 0xAA, 0xBB, 0xCC, 0xDD };
+
+    build(&s, &l);
+    CHECK_EQ(sim_link_set_raw_registration(&s, blob, sizeof(blob)), RES_OK);
+
+    req.id = 41; req.op = LINK_OP_REGISTER; req.sa_id = 0x04;
+    req.service_id = 0x00; req.value = 0;
+
+    CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_OK);
     CHECK_EQ(resp.data_len, sizeof(blob));
-    CHECK_EQ(resp.data[0], 0x04);
-    CHECK_EQ(resp.data[3], 0x21);
+    CHECK_EQ(resp.data[0], 0xAA);
+    CHECK_EQ(resp.data[3], 0xDD);
 }
 
 static void capacity_and_argument_limits_hold(void)
@@ -227,19 +257,37 @@ static void capacity_and_argument_limits_hold(void)
     sim_link_init(&s, 0x01);
 
     for (i = 0; i < TS_MAX_CAPABILITIES; i++)
-        CHECK_EQ(sim_link_add_service(&s, (uint8_t)i, 0x21, false,
-                                      0, 0, 0), RES_OK);
+        CHECK_EQ(sim_link_add_service(&s, (uint8_t)i, 0x21, false, 0,
+                                      k_sup_range, 2), RES_OK);
 
-    CHECK_EQ(sim_link_add_service(&s, 0x7F, 0x21, false, 0, 0, 0),
+    CHECK_EQ(sim_link_add_service(&s, 0x7F, 0x21, false, 0, k_sup_range, 2),
              RES_ETOOBIG);
 
     sim_link_init(&s, 0x01);
-    CHECK_EQ(sim_link_add_service(&s, 0x80, 0x21, false, 0, 0, 0), RES_EINVAL);
-    CHECK_EQ(sim_link_add_service(&s, 0x01, 0x21, false, 0, 0, 0), RES_OK);
-    /* A duplicate service id would make lookups ambiguous. */
-    CHECK_EQ(sim_link_add_service(&s, 0x01, 0x21, false, 0, 0, 0), RES_EINVAL);
-    CHECK_EQ(sim_link_add_service(NULL, 0x02, 0x21, false, 0, 0, 0),
+    CHECK_EQ(sim_link_add_service(&s, 0x80, 0x21, false, 0, k_sup_range, 2),
              RES_EINVAL);
+    CHECK_EQ(sim_link_add_service(&s, 0x01, 0x21, false, 0, k_sup_range, 2),
+             RES_OK);
+    /* A duplicate service id would make lookups ambiguous. */
+    CHECK_EQ(sim_link_add_service(&s, 0x01, 0x21, false, 0, k_sup_range, 2),
+             RES_EINVAL);
+    CHECK_EQ(sim_link_add_service(NULL, 0x02, 0x21, false, 0, k_sup_range, 2),
+             RES_EINVAL);
+    CHECK_EQ(sim_link_add_service(&s, 0x02, 0x21, false, 0, NULL, 2),
+             RES_EINVAL);
+
+    /* The general format has no type code, so its support datum is always
+     * two bytes. Anything else could not have come off a wire. */
+    CHECK_EQ(sim_link_add_service(&s, 0x03, 0x21, false, 0, k_sup_range, 1),
+             RES_EINVAL);
+
+    /* In the multi-byte format the width has to match what the type implies,
+     * or the decoder would read the next record at the wrong offset. */
+    sim_link_init(&s, 0x01);
+    CHECK_EQ(sim_link_set_identity(&s, TS_FORMAT_MULTIBYTE, TS_CLASS_SENSOR,
+                                   0xE0, "ACME", "PM-1"), RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x04, 0x21, false, 0, k_sup_range, 2),
+             RES_EINVAL);                            /* UINT16 wants four */
 }
 
 static void the_dispatcher_tolerates_a_null_link(void)
@@ -293,7 +341,8 @@ void test_sim_link(void)
     a_corrupted_reply_is_reported_as_malformed();
     a_second_request_before_the_first_is_collected_is_refused();
     a_down_link_refuses_work();
-    registration_returns_the_configured_bytes();
+    a_registration_reply_is_framed_as_one();
+    a_raw_registration_overrides_the_assembled_one();
     capacity_and_argument_limits_hold();
     the_dispatcher_tolerates_a_null_link();
     closing_releases_the_link();

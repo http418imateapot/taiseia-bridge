@@ -16,6 +16,13 @@
  *
  * A request in this format is always six bytes, so its data field is the two
  * bytes 3 and 4. A response carries as many data bytes as its length says.
+ *
+ * One exception, and it is why requests and responses are parsed by separate
+ * functions rather than one. A registration *request* carries SA id 0x00 and
+ * service id 0x00 in the usual places. A registration *response* has no
+ * service byte at all: byte 2 is already the first byte of its payload. The
+ * two are indistinguishable from their bytes alone, so the caller says which
+ * it is holding.
  */
 #ifndef TSB_CORE_TAISEIA_FRAME_H
 #define TSB_CORE_TAISEIA_FRAME_H
@@ -29,9 +36,10 @@
 
 typedef struct {
     uint8_t        sa_id;
-    uint8_t        service_id;  /* write bit already stripped               */
-    bool           write;       /* bit 7 of the service byte                */
-    const uint8_t *data;        /* points into the caller's buffer          */
+    uint8_t        service_id;   /* write bit stripped; 0 when registration */
+    bool           write;        /* bit 7 of the service byte               */
+    bool           registration; /* SA id 0x00: no service byte in a reply  */
+    const uint8_t *data;         /* points into the caller's buffer         */
     size_t         data_len;
 } ts_frame_t;
 
@@ -71,12 +79,23 @@ result_t ts_build_write(uint8_t *out, size_t cap, size_t *out_len,
 result_t ts_frame_declared_len(const uint8_t *buf, size_t have, size_t *need);
 
 /**
- * Decode a complete packet.
+ * Decode a complete request packet.
  *
- * Validates, in order: the declared length against `len`, the declared length
- * against the reserved range, and the checksum. `out->data` aliases `buf`, so
- * it stays valid only as long as the caller's buffer does.
+ * Byte 2 is always the service byte, registration included. Validates, in
+ * order: the declared length against `len`, the declared length against the
+ * reserved range, and the checksum. `out->data` aliases `buf`, so it stays
+ * valid only as long as the caller's buffer does.
  */
-result_t ts_parse(const uint8_t *buf, size_t len, ts_frame_t *out);
+result_t ts_parse_request(const uint8_t *buf, size_t len, ts_frame_t *out);
+
+/**
+ * Decode a complete response packet.
+ *
+ * Identical to `ts_parse_request` except for SA id 0x00, where there is no
+ * service byte and the payload starts at byte 2. Parsing a registration reply
+ * with the request layout silently drops its first payload byte and shifts
+ * every field after it, so the distinction is not cosmetic.
+ */
+result_t ts_parse_response(const uint8_t *buf, size_t len, ts_frame_t *out);
 
 #endif /* TSB_CORE_TAISEIA_FRAME_H */

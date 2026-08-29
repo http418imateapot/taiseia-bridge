@@ -11,6 +11,7 @@ int main(void)
 {
     test_frame();
     test_datatype();
+    test_registration();
     test_sim_link();
 
     printf("%d checks, %d failures\n", g_checks, g_failures);

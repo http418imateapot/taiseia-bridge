@@ -87,11 +87,15 @@ result_t ts_frame_declared_len(const uint8_t *buf, size_t have, size_t *need)
     return RES_OK;
 }
 
-result_t ts_parse(const uint8_t *buf, size_t len, ts_frame_t *out)
+/* Shared validation. `payload_at` is 2 for a registration reply, 3 otherwise;
+ * the caller has already decided which, because the bytes cannot say. */
+static result_t parse_common(const uint8_t *buf, size_t len, ts_frame_t *out,
+                             bool registration)
 {
     size_t   declared;
     result_t r;
     uint8_t  expect;
+    size_t   header;
 
     if (!buf || !out)
         return RES_EINVAL;
@@ -113,11 +117,42 @@ result_t ts_parse(const uint8_t *buf, size_t len, ts_frame_t *out)
     if (expect != buf[len - 1u])
         return RES_EFORMAT;
 
-    out->sa_id      = buf[1];
-    out->service_id = (uint8_t)(buf[2] & TS_SVC_ID_MASK);
-    out->write      = (buf[2] & TS_SVC_WRITE_BIT) != 0;
-    out->data       = &buf[3];
-    out->data_len   = len - TS_FRAME_OVERHEAD;
+    out->sa_id        = buf[1];
+    out->registration = registration;
+
+    /* length(1) + SA id(1) + checksum(1), plus a service byte unless this is
+     * a registration reply. */
+    header = registration ? TS_REG_FRAME_OVERHEAD : TS_FRAME_OVERHEAD;
+
+    if (!registration) {
+        out->service_id = (uint8_t)(buf[2] & TS_SVC_ID_MASK);
+        out->write      = (buf[2] & TS_SVC_WRITE_BIT) != 0;
+        out->data       = &buf[3];
+    } else {
+        out->data = &buf[2];
+    }
+    out->data_len = len - header;
 
     return RES_OK;
+}
+
+result_t ts_parse_request(const uint8_t *buf, size_t len, ts_frame_t *out)
+{
+    return parse_common(buf, len, out, false);
+}
+
+result_t ts_parse_response(const uint8_t *buf, size_t len, ts_frame_t *out)
+{
+    bool registration;
+
+    /* buf[1] is only safe to read once the length checks have run, so peek
+     * behind the same guards parse_common uses. */
+    if (!buf || !out)
+        return RES_EINVAL;
+    if (len < TS_FRAME_MIN_LEN)
+        return (len == 0) ? RES_EAGAIN : RES_EFORMAT;
+
+    registration = (buf[1] == TS_SA_ID_REGISTRATION);
+
+    return parse_common(buf, len, out, registration);
 }
