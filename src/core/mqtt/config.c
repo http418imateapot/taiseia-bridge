@@ -32,13 +32,22 @@ const char *config_topic_name(cfg_topic_t t)
     return k_topic_names[t];
 }
 
-static void set_str(char *dst, size_t cap, const char *v)
+/*
+ * Copy, and say whether the whole value fitted.
+ *
+ * Truncating is the failure this module exists to avoid: a topic template
+ * silently cut to its buffer length still renders, still publishes, and goes
+ * somewhere nobody is listening. Callers turn a false into a refusal.
+ */
+static bool set_str(char *dst, size_t cap, const char *v)
 {
     size_t i;
 
     for (i = 0; i + 1u < cap && v[i]; i++)
         dst[i] = v[i];
     dst[i] = '\0';
+
+    return v[i] == '\0';
 }
 
 void config_defaults(config_t *c)
@@ -57,9 +66,9 @@ void config_defaults(config_t *c)
     c->mqtt_keepalive_s = 60;
     c->tls_enable       = false;
 
-    set_str(c->topic_prefix, sizeof(c->topic_prefix), "v1");
+    (void)set_str(c->topic_prefix, sizeof(c->topic_prefix), "v1");
     for (i = 0; i < CFG_TOPIC_COUNT; i++)
-        set_str(c->topic[i], TOPIC_TEMPLATE_MAX, k_topic_defaults[i]);
+        (void)set_str(c->topic[i], TOPIC_TEMPLATE_MAX, k_topic_defaults[i]);
 
     /* A subscriber that joins late needs these to interpret anything else. A
      * retained telemetry sample, by contrast, is a stale sample. */
@@ -71,7 +80,7 @@ void config_defaults(config_t *c)
     c->reregister_interval_s = 300;
     c->expand_bitfields      = false;
 
-    set_str(c->log_level, sizeof(c->log_level), "info");
+    (void)set_str(c->log_level, sizeof(c->log_level), "info");
     write_code_map_defaults(&c->write_codes);
 }
 
@@ -187,12 +196,13 @@ static bool is_null_literal(const char *v)
     return v[0] == '\0' || eq_ci(v, "null") || eq_ci(v, "none");
 }
 
-static void set_str_or_empty(char *dst, size_t cap, const char *v)
+static bool set_str_or_empty(char *dst, size_t cap, const char *v)
 {
-    if (is_null_literal(v))
+    if (is_null_literal(v)) {
         dst[0] = '\0';
-    else
-        set_str(dst, cap, v);
+        return true;
+    }
+    return set_str(dst, cap, v);
 }
 
 /* write_result_codes = ok,unknown,read_only,not_taken,no_reply */
@@ -244,7 +254,7 @@ result_t config_apply_line(config_t *c, const char *line, int lineno,
         return RES_EFORMAT;
     }
 
-    set_str(buf, sizeof(buf), line);
+    (void)set_str(buf, sizeof(buf), line);
 
     hash = strchr(buf, '#');
     if (hash)
@@ -267,22 +277,27 @@ result_t config_apply_line(config_t *c, const char *line, int lineno,
         if (strcmp(k, k_topic_names[i]) == 0) {
             if (is_null_literal(v))
                 goto bad_value;
-            set_str(c->topic[i], TOPIC_TEMPLATE_MAX, v);
+            if (!set_str(c->topic[i], TOPIC_TEMPLATE_MAX, v))
+                goto too_long;
             return RES_OK;
         }
     }
 
     if (strcmp(k, "mqtt_host") == 0) {
-        set_str_or_empty(c->mqtt_host, sizeof(c->mqtt_host), v);
+        if (!set_str_or_empty(c->mqtt_host, sizeof(c->mqtt_host), v))
+            goto too_long;
     } else if (strcmp(k, "mqtt_port") == 0) {
         if (!parse_long(v, 1, 65535, &n)) goto bad_value;
         c->mqtt_port = (uint16_t)n;
     } else if (strcmp(k, "mqtt_username") == 0) {
-        set_str_or_empty(c->mqtt_username, sizeof(c->mqtt_username), v);
+        if (!set_str_or_empty(c->mqtt_username, sizeof(c->mqtt_username), v))
+            goto too_long;
     } else if (strcmp(k, "mqtt_password") == 0) {
-        set_str_or_empty(c->mqtt_password, sizeof(c->mqtt_password), v);
+        if (!set_str_or_empty(c->mqtt_password, sizeof(c->mqtt_password), v))
+            goto too_long;
     } else if (strcmp(k, "mqtt_client_id") == 0) {
-        set_str_or_empty(c->mqtt_client_id, sizeof(c->mqtt_client_id), v);
+        if (!set_str_or_empty(c->mqtt_client_id, sizeof(c->mqtt_client_id), v))
+            goto too_long;
     } else if (strcmp(k, "mqtt_keepalive") == 0) {
         if (!parse_long(v, 10, 3600, &n)) goto bad_value;
         c->mqtt_keepalive_s = (uint16_t)n;
@@ -290,18 +305,21 @@ result_t config_apply_line(config_t *c, const char *line, int lineno,
         if (!parse_bool(v, &c->tls_enable)) goto bad_value;
     } else if (strcmp(k, "topic_prefix") == 0) {
         if (is_null_literal(v)) goto bad_value;
-        set_str(c->topic_prefix, sizeof(c->topic_prefix), v);
+        if (!set_str(c->topic_prefix, sizeof(c->topic_prefix), v))
+            goto too_long;
     } else if (strcmp(k, "retain_capabilities") == 0) {
         if (!parse_bool(v, &c->retain_capabilities)) goto bad_value;
     } else if (strcmp(k, "retain_status") == 0) {
         if (!parse_bool(v, &c->retain_status)) goto bad_value;
     } else if (strcmp(k, "serial_port") == 0) {
-        set_str_or_empty(c->serial_port, sizeof(c->serial_port), v);
+        if (!set_str_or_empty(c->serial_port, sizeof(c->serial_port), v))
+            goto too_long;
     } else if (strcmp(k, "serial_baud") == 0) {
         if (!parse_long(v, 1200, 57600, &n)) goto bad_value;
         c->serial_baud = (uint32_t)n;
     } else if (strcmp(k, "device_id") == 0) {
-        set_str_or_empty(c->device_id, sizeof(c->device_id), v);
+        if (!set_str_or_empty(c->device_id, sizeof(c->device_id), v))
+            goto too_long;
     } else if (strcmp(k, "report_interval") == 0) {
         if (!parse_long(v, 5, 86400, &n)) goto bad_value;
         c->report_interval_s = (int)n;
@@ -313,7 +331,8 @@ result_t config_apply_line(config_t *c, const char *line, int lineno,
     } else if (strcmp(k, "log_level") == 0) {
         if (!eq_ci(v, "error") && !eq_ci(v, "warn") &&
             !eq_ci(v, "info")  && !eq_ci(v, "debug")) goto bad_value;
-        set_str(c->log_level, sizeof(c->log_level), v);
+        if (!set_str(c->log_level, sizeof(c->log_level), v))
+            goto too_long;
     } else if (strcmp(k, "write_result_codes") == 0) {
         if (is_null_literal(v)) {
             write_code_map_defaults(&c->write_codes);
@@ -329,6 +348,10 @@ result_t config_apply_line(config_t *c, const char *line, int lineno,
 
 bad_value:
     say(err, errcap, "bad value for '", k, "'");
+    return RES_EFORMAT;
+
+too_long:
+    say(err, errcap, "value too long for '", k, "'");
     return RES_EFORMAT;
 }
 

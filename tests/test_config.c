@@ -185,14 +185,32 @@ static void validation_runs_before_anything_starts(void)
     CHECK_EQ(config_validate(&c, "TS-1", err, sizeof(err)), RES_EINVAL);
     CHECK(err[0] != '\0');
 
-    /* And so is a topic too long to publish. */
+    /* And so is a topic that fits as a template but not once rendered. */
     config_defaults(&c);
     apply(&c, "mqtt_host = broker", RES_OK);
+    apply(&c, "topic_telemetry = {id}/{id}/{id}/{id}/{id}", RES_OK);
+    CHECK_EQ(config_validate(&c, "TS-1", err, sizeof(err)), RES_OK);
+    CHECK_EQ(config_validate(&c,
+                             "0123456789012345678901234567890123456789",
+                             err, sizeof(err)), RES_ETOOBIG);
+
+    /*
+     * A value longer than its field is refused outright. Truncating it would
+     * leave the device running a topic the operator never wrote, and it would
+     * still render, still publish, and go nowhere useful.
+     */
+    config_defaults(&c);
     apply(&c, "topic_telemetry = {prefix}/{id}/aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          RES_OK);
-    CHECK(config_validate(&c, "TS-1", err, sizeof(err)) != RES_OK);
+          RES_EFORMAT);
+    CHECK_STREQ(c.topic[CFG_TOPIC_TELEMETRY],
+                "{prefix}/from/device/{id}/telemetry");
+    apply(&c, "mqtt_host = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          RES_EFORMAT);
+    CHECK(!config_mqtt_enabled(&c));
 
     CHECK_EQ(config_validate(NULL, "TS-1", err, sizeof(err)), RES_EINVAL);
     CHECK_EQ(config_validate(&c, NULL, err, sizeof(err)), RES_EINVAL);
