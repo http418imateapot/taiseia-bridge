@@ -97,10 +97,74 @@ static result_t parse_string(jr_parser_t *p)
     return RES_EFORMAT;     /* unterminated */
 }
 
+static bool lit_eq(const char *s, size_t n, const char *lit)
+{
+    return strlen(lit) == n && strncmp(s, lit, n) == 0;
+}
+
+/*
+ * A JSON number: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
+ *
+ * Worth spelling out rather than accepting any run of non-delimiters. "tru",
+ * "01" and "1.2.3" all look like values to a lax scanner, and a control
+ * command carrying one of them should be refused, not half-understood.
+ */
+static bool is_number(const char *s, size_t n)
+{
+    size_t i = 0;
+
+    if (n == 0)
+        return false;
+
+    if (s[i] == '-')
+        i++;
+
+    if (i >= n)
+        return false;
+
+    if (s[i] == '0') {
+        i++;
+    } else if (s[i] >= '1' && s[i] <= '9') {
+        while (i < n && s[i] >= '0' && s[i] <= '9')
+            i++;
+    } else {
+        return false;
+    }
+
+    if (i < n && s[i] == '.') {
+        size_t digits = 0;
+
+        i++;
+        while (i < n && s[i] >= '0' && s[i] <= '9') {
+            i++;
+            digits++;
+        }
+        if (digits == 0)
+            return false;
+    }
+
+    if (i < n && (s[i] == 'e' || s[i] == 'E')) {
+        size_t digits = 0;
+
+        i++;
+        if (i < n && (s[i] == '+' || s[i] == '-'))
+            i++;
+        while (i < n && s[i] >= '0' && s[i] <= '9') {
+            i++;
+            digits++;
+        }
+        if (digits == 0)
+            return false;
+    }
+
+    return i == n;
+}
+
 static result_t parse_primitive(jr_parser_t *p)
 {
     size_t    start = p->pos;
     size_t    i;
+    size_t    n;
     jr_tok_t *t;
 
     for (i = start; i < p->len; i++) {
@@ -112,7 +176,14 @@ static result_t parse_primitive(jr_parser_t *p)
         if ((unsigned char)c < 0x20u || (unsigned char)c >= 0x7Fu)
             return RES_EFORMAT;
     }
-    if (i == start)
+    n = i - start;
+    if (n == 0)
+        return RES_EFORMAT;
+
+    if (!lit_eq(p->js + start, n, "true") &&
+        !lit_eq(p->js + start, n, "false") &&
+        !lit_eq(p->js + start, n, "null") &&
+        !is_number(p->js + start, n))
         return RES_EFORMAT;
 
     t = alloc_tok(p);
@@ -127,11 +198,31 @@ static result_t parse_primitive(jr_parser_t *p)
     return RES_OK;
 }
 
+/*
+ * What may legally appear next.
+ *
+ * Tracking this is what separates a parser from a scanner. Without it
+ * {"a":}, {"a" 1} and a trailing comma all pass, because each is a plausible
+ * sequence of tokens -- and a control command that parses into something other
+ * than what was sent is worse than one that is refused.
+ */
+typedef enum {
+    EX_VALUE = 0,     /* a value must follow                            */
+    EX_FIRST_VALUE,   /* a value, or the empty array's closer           */
+    EX_KEY,           /* a key must follow                              */
+    EX_FIRST_KEY,     /* a key, or the empty object's closer            */
+    EX_COLON,
+    EX_COMMA,         /* a comma, or this container's closer            */
+    EX_DONE           /* the root value is complete; only spaces remain */
+} jr_expect_t;
+
 result_t jr_parse(const char *js, size_t len, jr_tok_t *toks, int max,
                   int *out_count)
 {
     jr_parser_t p;
     result_t    r;
+    jr_expect_t exp = EX_VALUE;
+    jr_type_t   ctype[JR_MAX_DEPTH];
 
     if (!js || !toks || !out_count || max <= 0)
         return RES_EINVAL;
@@ -152,9 +243,10 @@ result_t jr_parse(const char *js, size_t len, jr_tok_t *toks, int max,
         switch (c) {
         case '{':
         case '[':
+            if (exp != EX_VALUE && exp != EX_FIRST_VALUE)
+                return RES_EFORMAT;
             if (p.depth >= JR_MAX_DEPTH)
                 return RES_EFORMAT;
-            p.depth++;
 
             t = alloc_tok(&p);
             if (!t)
@@ -165,7 +257,9 @@ result_t jr_parse(const char *js, size_t len, jr_tok_t *toks, int max,
                 toks[p.super].size++;
                 t->parent = p.super;
             }
+            ctype[p.depth++] = t->type;
             p.super = p.next - 1;
+            exp = (c == '{') ? EX_FIRST_KEY : EX_FIRST_VALUE;
             break;
 
         case '}':
@@ -173,11 +267,17 @@ result_t jr_parse(const char *js, size_t len, jr_tok_t *toks, int max,
             jr_type_t want = (c == '}') ? JR_OBJECT : JR_ARRAY;
             int       i;
 
-            if (p.depth == 0)
+            if (p.depth == 0 || ctype[p.depth - 1] != want)
                 return RES_EFORMAT;
+            /* An empty container, or one whose last value is complete. A
+             * trailing comma leaves EX_KEY or EX_VALUE and is refused. */
+            if (exp != EX_COMMA &&
+                !(want == JR_OBJECT && exp == EX_FIRST_KEY) &&
+                !(want == JR_ARRAY  && exp == EX_FIRST_VALUE))
+                return RES_EFORMAT;
+
             p.depth--;
 
-            /* Close the innermost container still open. */
             for (i = p.next - 1; i >= 0; i--) {
                 if (toks[i].start != -1 && toks[i].end == -1) {
                     if (toks[i].type != want)
@@ -189,27 +289,47 @@ result_t jr_parse(const char *js, size_t len, jr_tok_t *toks, int max,
             }
             if (i < 0)
                 return RES_EFORMAT;
+
+            exp = (p.depth == 0) ? EX_DONE : EX_COMMA;
             break;
         }
 
         case '"':
-            r = parse_string(&p);
-            if (r != RES_OK)
-                return r;
-            if (p.super != -1)
-                toks[p.super].size++;
+            if (exp == EX_KEY || exp == EX_FIRST_KEY) {
+                r = parse_string(&p);
+                if (r != RES_OK)
+                    return r;
+                if (p.super != -1)
+                    toks[p.super].size++;
+                exp = EX_COLON;
+            } else if (exp == EX_VALUE || exp == EX_FIRST_VALUE) {
+                r = parse_string(&p);
+                if (r != RES_OK)
+                    return r;
+                if (p.super != -1)
+                    toks[p.super].size++;
+                exp = (p.depth == 0) ? EX_DONE : EX_COMMA;
+            } else {
+                return RES_EFORMAT;
+            }
             break;
 
         case ':':
+            if (exp != EX_COLON)
+                return RES_EFORMAT;
             /* The key just written owns the value that follows. */
             p.super = p.next - 1;
+            exp = EX_VALUE;
             break;
 
         case ',':
+            if (exp != EX_COMMA || p.depth == 0)
+                return RES_EFORMAT;
             if (p.super != -1 &&
                 toks[p.super].type != JR_ARRAY &&
                 toks[p.super].type != JR_OBJECT)
                 p.super = toks[p.super].parent;
+            exp = (ctype[p.depth - 1] == JR_OBJECT) ? EX_KEY : EX_VALUE;
             break;
 
         case ' ': case '\t': case '\n': case '\r':
@@ -218,11 +338,14 @@ result_t jr_parse(const char *js, size_t len, jr_tok_t *toks, int max,
         case '-': case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
         case 't': case 'f': case 'n':
+            if (exp != EX_VALUE && exp != EX_FIRST_VALUE)
+                return RES_EFORMAT;
             r = parse_primitive(&p);
             if (r != RES_OK)
                 return r;
             if (p.super != -1)
                 toks[p.super].size++;
+            exp = (p.depth == 0) ? EX_DONE : EX_COMMA;
             break;
 
         default:
@@ -230,16 +353,9 @@ result_t jr_parse(const char *js, size_t len, jr_tok_t *toks, int max,
         }
     }
 
-    /* Every container must have been closed. */
-    {
-        int i;
-
-        for (i = 0; i < p.next; i++) {
-            if (toks[i].start != -1 && toks[i].end == -1)
-                return RES_EFORMAT;
-        }
-    }
-    if (p.next == 0)
+    /* Anything short of a complete root value -- an unclosed container, a
+     * dangling key, an empty document -- lands here. */
+    if (exp != EX_DONE || p.next == 0)
         return RES_EFORMAT;
 
     *out_count = p.next;

@@ -337,7 +337,7 @@ static void escapes_are_decoded(void)
     CHECK(v > 0);
     CHECK_EQ(jr_str(js, &toks[v], out, sizeof(out)), RES_OK);
     /* The last two escapes are a surrogate pair for U+1F600. */
-    CHECK_STREQ(out, "a\"b\\c\nA\xE6\xB8\xAC\xF0\x9F\x98\x80");
+    CHECK_STREQ(out, "a\"b\\c\ndA\xE6\xB8\xAC\xF0\x9F\x98\x80");
 
     CHECK_EQ(jr_str(js, &toks[v], out, 4), RES_ETOOBIG);
 }
@@ -356,6 +356,14 @@ static void malformed_documents_are_refused(void)
         "{\"a\":\"bad\\qescape\"}",
         "{\"a\":\"\x01\"}",
         "{\"a\":tru}",
+        "{\"a\":01}",
+        "{\"a\":1.}",
+        "{\"a\":1e}",
+        "{\"a\":+1}",
+        "{\"a\":1,}",
+        "[1,]",
+        "{\"a\":1}{\"b\":2}",
+        "1 2",
         "@"
     };
     size_t i;
