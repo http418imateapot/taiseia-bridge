@@ -195,6 +195,21 @@ void jw_raw(jsonw_t *w, const char *p, size_t n)
     sb_write(w->sb, p, n);
 }
 
+void jw_hex(jsonw_t *w, const uint8_t *p, size_t n)
+{
+    if (!w) return;
+    separate(w);
+    sb_putc(w->sb, '"');
+    sb_puthex(w->sb, p, n);
+    sb_putc(w->sb, '"');
+}
+
+void jw_khex(jsonw_t *w, const char *key, const uint8_t *p, size_t n)
+{
+    jw_key(w, key);
+    jw_hex(w, p, n);
+}
+
 void jw_kstr(jsonw_t *w, const char *key, const char *s)
 {
     jw_key(w, key);

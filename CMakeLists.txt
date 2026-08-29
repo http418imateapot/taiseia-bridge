@@ -68,6 +68,9 @@ add_library(tsb_core STATIC
     src/core/taiseia/datatype.c
     src/core/taiseia/registration.c
     src/core/model/appliance.c
+    src/core/mqtt/topic.c
+    src/core/mqtt/payload.c
+    src/core/mqtt/config.c
     src/ports/appliance_link.c)
 target_include_directories(tsb_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tsb_core PRIVATE tsb_warnings)
@@ -88,7 +91,9 @@ if(TSB_BUILD_TESTS)
         tests/test_datatype.c
         tests/test_registration.c
         tests/test_sim_link.c
-        tests/test_appliance.c)
+        tests/test_appliance.c
+        tests/test_payload.c
+        tests/test_config.c)
     target_include_directories(tsb_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_link_libraries(tsb_tests PRIVATE tsb_sim tsb_warnings)
 

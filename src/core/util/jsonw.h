@@ -56,6 +56,9 @@ void jw_bool(jsonw_t *w, bool v);
 void jw_null(jsonw_t *w);
 void jw_raw(jsonw_t *w, const char *p, size_t n);
 
+/** A byte span as a lower-case hex string. */
+void jw_hex(jsonw_t *w, const uint8_t *p, size_t n);
+
 /* Key plus value, the common case. */
 void jw_kstr(jsonw_t *w, const char *key, const char *s);
 void jw_kuint(jsonw_t *w, const char *key, uint64_t v);
@@ -63,6 +66,7 @@ void jw_kint(jsonw_t *w, const char *key, int64_t v);
 void jw_kbool(jsonw_t *w, const char *key, bool v);
 void jw_knull(jsonw_t *w, const char *key);
 void jw_kraw(jsonw_t *w, const char *key, const char *p, size_t n);
+void jw_khex(jsonw_t *w, const char *key, const uint8_t *p, size_t n);
 
 /** A key whose name is a decimal number, as service-keyed objects need. */
 void jw_key_uint(jsonw_t *w, uint64_t key);

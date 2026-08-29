@@ -15,6 +15,8 @@ int main(void)
     test_registration();
     test_sim_link();
     test_appliance();
+    test_payload();
+    test_config();
 
     printf("%d checks, %d failures\n", g_checks, g_failures);
 
