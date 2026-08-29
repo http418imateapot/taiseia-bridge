@@ -247,7 +247,7 @@ static result_t open_sim(link_t *l)
     return RES_OK;
 }
 
-static result_t open_uart(link_t *l, const char *port, uint32_t baud)
+static result_t open_uart(const char *port, uint32_t baud)
 {
     serial_params_t p;
     result_t        r;
@@ -330,7 +330,7 @@ int main(int argc, char *argv[])
             return 1;
         }
     } else {
-        if (open_uart(&link, port, (uint32_t)baud) != RES_OK) {
+        if (open_uart(port, (uint32_t)baud) != RES_OK) {
             platform_shutdown();
             return 1;
         }

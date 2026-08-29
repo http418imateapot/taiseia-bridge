@@ -25,6 +25,10 @@ option(TSB_WERROR      "Treat warnings as errors" OFF)
 add_library(tsb_warnings INTERFACE)
 if(MSVC)
     target_compile_options(tsb_warnings INTERFACE /W4)
+    # fopen and snprintf are standard C. The _s variants MSVC recommends are
+    # not, and reaching for them would put a platform #ifdef in files that are
+    # meant to have none.
+    target_compile_definitions(tsb_warnings INTERFACE _CRT_SECURE_NO_WARNINGS)
     if(TSB_WERROR)
         target_compile_options(tsb_warnings INTERFACE /WX)
     endif()

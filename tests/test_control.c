@@ -155,20 +155,20 @@ static void more_than_a_batch_holds_is_refused(void)
     size_t        i;
     size_t        pos = 0;
 
-    pos += (size_t)sprintf(js + pos, "{\"attributes\":{");
+    pos += (size_t)snprintf(js + pos, sizeof(js) - pos, "{\"attributes\":{");
     for (i = 0; i < APPL_WRITE_BATCH_MAX; i++)
-        pos += (size_t)sprintf(js + pos, "%s\"%u\":1",
-                               i ? "," : "", (unsigned)i);
-    pos += (size_t)sprintf(js + pos, "}}");
+        pos += (size_t)snprintf(js + pos, sizeof(js) - pos, "%s\"%u\":1",
+                                i ? "," : "", (unsigned)i);
+    pos += (size_t)snprintf(js + pos, sizeof(js) - pos, "}}");
     CHECK_EQ(parse(js, &c), RES_OK);
     CHECK_EQ(c.n, APPL_WRITE_BATCH_MAX);
 
     pos = 0;
-    pos += (size_t)sprintf(js + pos, "{\"attributes\":{");
+    pos += (size_t)snprintf(js + pos, sizeof(js) - pos, "{\"attributes\":{");
     for (i = 0; i < APPL_WRITE_BATCH_MAX + 1u; i++)
-        pos += (size_t)sprintf(js + pos, "%s\"%u\":1",
-                               i ? "," : "", (unsigned)i);
-    pos += (size_t)sprintf(js + pos, "}}");
+        pos += (size_t)snprintf(js + pos, sizeof(js) - pos, "%s\"%u\":1",
+                                i ? "," : "", (unsigned)i);
+    pos += (size_t)snprintf(js + pos, sizeof(js) - pos, "}}");
     CHECK_EQ(parse(js, &c), RES_ETOOBIG);
 }
 
@@ -183,10 +183,11 @@ static void a_tag_too_large_to_echo_is_refused(void)
     size_t        pos;
     size_t        i;
 
-    pos = (size_t)sprintf(js, "{\"tag\":\"");
+    pos = (size_t)snprintf(js, sizeof(js), "{\"tag\":\"");
     for (i = 0; i < CONTROL_TAG_MAX; i++)
         js[pos++] = 'x';
-    pos += (size_t)sprintf(js + pos, "\",\"attributes\":{\"1\":1}}");
+    pos += (size_t)snprintf(js + pos, sizeof(js) - pos,
+                            "\",\"attributes\":{\"1\":1}}");
     js[pos] = '\0';
 
     CHECK_EQ(control_parse(js, pos, &c), RES_ETOOBIG);
