@@ -41,13 +41,17 @@ const char *config_topic_name(cfg_topic_t t)
  */
 static bool set_str(char *dst, size_t cap, const char *v)
 {
-    size_t i;
+    size_t n = strlen(v);
 
-    for (i = 0; i + 1u < cap && v[i]; i++)
-        dst[i] = v[i];
-    dst[i] = '\0';
+    /* Length first, then copy. Copying what fits and reporting failure
+     * afterwards leaves the caller with both an error and a half-written
+     * setting -- worse than either on its own, because the operator now has a
+     * device running a value nobody typed. A refusal changes nothing. */
+    if (n >= cap)
+        return false;
 
-    return v[i] == '\0';
+    memcpy(dst, v, n + 1u);
+    return true;
 }
 
 void config_defaults(config_t *c)
