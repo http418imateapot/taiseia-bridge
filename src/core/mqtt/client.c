@@ -282,7 +282,7 @@ static result_t pump_rx(mqtt_client_t *c, socket_t *sock, int64_t now_ms)
 
 /* ------------------------------------------------------------------- tick */
 
-static result_t start_connect(mqtt_client_t *c, socket_t *sock, int64_t now_ms)
+static result_t start_connect(mqtt_client_t *c, int64_t now_ms)
 {
     mqtt_connect_t o;
     size_t         len = 0;
@@ -373,7 +373,7 @@ result_t mqttc_tick(mqtt_client_t *c, socket_t *sock, int64_t now_ms)
             go_down(c, sock, now_ms);
             return RES_OK;
         }
-        if (start_connect(c, sock, now_ms) != RES_OK) {
+        if (start_connect(c, now_ms) != RES_OK) {
             go_down(c, sock, now_ms);
             return RES_OK;
         }
