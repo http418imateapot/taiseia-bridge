@@ -61,6 +61,9 @@ endif()
 #
 add_library(tsb_core STATIC
     src/core/util/result.c
+    src/core/util/strbuf.c
+    src/core/util/jsonw.c
+    src/core/util/jsonr.c
     src/core/taiseia/frame.c
     src/core/taiseia/datatype.c
     src/core/taiseia/registration.c
@@ -80,6 +83,7 @@ if(TSB_BUILD_TESTS)
 
     add_executable(tsb_tests
         tests/test_main.c
+        tests/test_json.c
         tests/test_frame.c
         tests/test_datatype.c
         tests/test_registration.c

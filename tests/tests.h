@@ -49,6 +49,7 @@ extern int g_failures;
         }                                                                    \
     } while (0)
 
+void test_json(void);
 void test_frame(void);
 void test_datatype(void);
 void test_registration(void);

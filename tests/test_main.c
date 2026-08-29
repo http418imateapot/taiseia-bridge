@@ -9,6 +9,7 @@ int g_failures;
 
 int main(void)
 {
+    test_json();
     test_frame();
     test_datatype();
     test_registration();
