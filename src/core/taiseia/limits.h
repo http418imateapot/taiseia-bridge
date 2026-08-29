@@ -61,6 +61,13 @@
  */
 #define TS_REASSEMBLY_MAX       1024u
 
+/*
+ * The most we will hold for one service's value. A multi-byte appliance can
+ * answer a batch read with many items; past this the reading is refused rather
+ * than truncated, because a short batch looks exactly like a complete one.
+ */
+#define TS_VALUE_MAX_BYTES      64u
+
 /* -------------------------------------------------------- service and role --
  *
  * Byte 2 packs the access direction into the top bit and the service id into

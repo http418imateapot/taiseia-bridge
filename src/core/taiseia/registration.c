@@ -117,9 +117,12 @@ result_t ts_registration_parse(const uint8_t *data, size_t len,
     out->baud_code    = (uint8_t)(data[3] & 0x0Fu);
     out->sa_id        = (uint16_t)(((uint16_t)data[4] << 8) | data[5]);
 
-    /* A fragmented reply is only part of the picture. Reassembly is not
-     * implemented; decoding this piece alone would report a truncated
-     * capability list as if it were complete. */
+    /*
+     * A fragment is only part of the picture, and decoding one alone would
+     * report a truncated capability list as if it were complete. Joining them
+     * up happens above this, in core/taiseia/reassembly.c, which hands over a
+     * payload whose fragment number is zero because it is whole.
+     */
     if (out->fragment != 0u)
         return RES_EUNSUPPORTED;
 

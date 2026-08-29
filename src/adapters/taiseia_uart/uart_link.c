@@ -29,21 +29,26 @@ static void finish(uart_link_t *u, result_t status)
     u->phase         = UL_DONE;
 }
 
-static void finish_ok(uart_link_t *u, const ts_frame_t *f)
+static void finish_assembled(uart_link_t *u)
 {
+    const ts_reasm_t *r = &u->reasm;
+
     memset(&u->result, 0, sizeof(u->result));
     u->result.id         = u->req_id;
     u->result.status     = RES_OK;
-    u->result.sa_id      = f->sa_id;
-    u->result.service_id = f->service_id;
-    u->result.write      = f->write;
-    u->result.data_len   = f->data_len;
+    u->result.sa_id      = r->sa_id;
+    u->result.service_id = r->service_id;
+    u->result.write      = r->write;
+    u->result.multibyte  = (r->kind == TS_REPLY_MULTIBYTE);
+    u->result.dtype      = r->dtype;
+    u->result.count      = r->count;
 
-    if (f->data_len > sizeof(u->result.data)) {
-        u->result.status   = RES_ETOOBIG;
-        u->result.data_len = 0;
-    } else if (f->data_len > 0) {
-        memcpy(u->result.data, f->data, f->data_len);
+    if (r->len > sizeof(u->result.data)) {
+        u->result.status = RES_ETOOBIG;
+    } else {
+        u->result.data_len = r->len;
+        if (r->len > 0)
+            memcpy(u->result.data, r->data, r->len);
     }
 
     u->phase = UL_DONE;
@@ -62,18 +67,40 @@ static result_t ul_submit(void *self, const link_req_t *req)
         return RES_EBUSY;
 
     switch (req->op) {
-    case LINK_OP_READ:
-        r = ts_build_read(u->req, sizeof(u->req), &u->req_len,
-                          req->sa_id, req->service_id);
-        break;
     case LINK_OP_REGISTER:
+        /* Registration is in the general shape for both directions, whatever
+         * format the appliance uses for everything else. */
         r = ts_build_read(u->req, sizeof(u->req), &u->req_len,
                           (uint8_t)TS_SA_ID_REGISTRATION, 0u);
+        u->kind = TS_REPLY_REGISTRATION;
         break;
+
+    case LINK_OP_READ:
+        if (req->multibyte) {
+            r = ts_build_mb_read(u->req, sizeof(u->req), &u->req_len,
+                                 req->sa_id, req->service_id, req->dtype,
+                                 req->value_len);
+            u->kind = TS_REPLY_MULTIBYTE;
+        } else {
+            r = ts_build_read(u->req, sizeof(u->req), &u->req_len,
+                              req->sa_id, req->service_id);
+            u->kind = TS_REPLY_GENERAL;
+        }
+        break;
+
     case LINK_OP_WRITE:
-        r = ts_build_write(u->req, sizeof(u->req), &u->req_len,
-                           req->sa_id, req->service_id, req->value);
+        if (req->multibyte) {
+            r = ts_build_mb_write(u->req, sizeof(u->req), &u->req_len,
+                                  req->sa_id, req->service_id, req->dtype,
+                                  req->count, req->data, req->data_len);
+            u->kind = TS_REPLY_MULTIBYTE;
+        } else {
+            r = ts_build_write(u->req, sizeof(u->req), &u->req_len,
+                               req->sa_id, req->service_id, req->value);
+            u->kind = TS_REPLY_GENERAL;
+        }
         break;
+
     default:
         return RES_EINVAL;
     }
@@ -84,6 +111,8 @@ static result_t ul_submit(void *self, const link_req_t *req)
      * given up on. Reading it as this reply would attribute one service's
      * value to another, permanently and with nothing to detect it. */
     (void)serial_flush(u->sp);
+
+    ts_reasm_begin(&u->reasm, u->kind);
 
     u->req_id   = req->id;
     u->req_sent = 0;
@@ -120,6 +149,39 @@ static void step_writing(uart_link_t *u)
     }
 }
 
+/*
+ * One complete packet is at the front of u->rx. Give it to the reassembler,
+ * then shift whatever followed it down: a single read can return more than one
+ * fragment, and dropping the remainder would strand a reply that did in fact
+ * arrive whole.
+ */
+static void take_packet(uart_link_t *u, size_t need, int64_t now)
+{
+    result_t r = ts_reasm_add(&u->reasm, u->rx, need);
+
+    if (u->rx_len > need)
+        memmove(u->rx, u->rx + need, u->rx_len - need);
+    u->rx_len -= need;
+
+    if (r == RES_EAGAIN) {
+        /*
+         * More fragments are expected, and the standard gives the next one the
+         * same 200 ms it gives a first reply. Resetting the deadline here is
+         * what stops a long, legitimate answer from being judged a timeout.
+         */
+        u->deadline_ms  = now + TS_RESPONSE_TIMEOUT_MS;
+        u->last_byte_ms = now;
+        return;
+    }
+
+    if (r != RES_OK) {
+        finish(u, r);
+        return;
+    }
+
+    finish_assembled(u);
+}
+
 static void step_reading(uart_link_t *u)
 {
     int64_t  now = u->now_ms();
@@ -139,35 +201,33 @@ static void step_reading(uart_link_t *u)
         }
     }
 
+    /* Take every complete packet the buffer holds before deciding anything
+     * about deadlines. */
+    while (u->rx_len > 0) {
+        r = ts_frame_declared_len(u->rx, u->rx_len, &need);
+        if (r == RES_EFORMAT) {
+            /* The first byte is not a length any packet could have, so
+             * nothing that follows can be trusted to line up either. */
+            finish(u, RES_EFORMAT);
+            return;
+        }
+        if (r != RES_OK || u->rx_len < need)
+            break;                        /* incomplete; wait for the rest */
+
+        take_packet(u, need, now);
+        if (u->phase != UL_READING)
+            return;                       /* assembled, or refused */
+    }
+
     if (u->rx_len == 0) {
         if (now >= u->deadline_ms)
             finish(u, RES_ETIMEOUT);
         return;
     }
 
-    r = ts_frame_declared_len(u->rx, u->rx_len, &need);
-    if (r == RES_EFORMAT) {
-        /* The first byte is not a length any packet could have, so nothing
-         * that follows can be trusted to line up either. */
-        finish(u, RES_EFORMAT);
-        return;
-    }
-
-    if (r == RES_OK && u->rx_len >= need) {
-        ts_frame_t f;
-
-        r = ts_parse_response(u->rx, need, &f);
-        if (r != RES_OK) {
-            finish(u, r);
-            return;
-        }
-        finish_ok(u, &f);
-        return;
-    }
-
-    /* Still incomplete. A gap this long means these bytes are not one packet,
-     * and continuing to accumulate would eventually assemble a plausible frame
-     * out of two halves. */
+    /* Part of a packet, and nothing more coming. A gap this long means these
+     * bytes are not one packet, and continuing to accumulate would eventually
+     * assemble a plausible frame out of two halves. */
     if (now - u->last_byte_ms > TS_INTERBYTE_MAX_MS) {
         finish(u, RES_EFORMAT);
         return;

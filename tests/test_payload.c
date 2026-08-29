@@ -209,7 +209,7 @@ static void multibyte_capabilities_resolve_their_shape(void)
     appl_init(&a, &p);
     for (i = 0; i < 6; i++)
         CHECK_EQ(appl_tick(&a, &l, 0), RES_OK);
-    CHECK_EQ(appl_state(&a), APPL_READY_IDENTITY_ONLY);
+    CHECK_EQ(appl_state(&a), APPL_READY);
 
     sb_init(&sb, buf, sizeof(buf));
     CHECK_EQ(payload_capabilities(&sb, "TS-1", "T", &a), RES_OK);
@@ -223,6 +223,62 @@ static void multibyte_capabilities_resolve_their_shape(void)
                 "\"support\":{\"kind\":\"bits\",\"mask\":3845,\"width\":16}},"
                 "{\"id\":3,\"access\":\"r\",\"dtype\":\"Y-M-D-H-M-S\","
                 "\"support\":{\"kind\":\"raw\",\"hex\":\"07e80c0c0e1e\"}}]}");
+}
+
+/*
+ * Multi-byte readings, in the three shapes they come in: a number, a batch,
+ * and something whose width nothing here can decode.
+ *
+ * The dtype travels with the capability list, not with each reading, so a
+ * consumer that wants to know whether "3" is a bitmask or a count has to look
+ * it up there. What telemetry must not do is silently change the shape of a
+ * value between publishes.
+ */
+static void multibyte_telemetry_renders_each_shape(void)
+{
+    sim_link_t    s;
+    link_t        l;
+    appliance_t   a;
+    appl_policy_t p;
+    char          buf[2048];
+    strbuf_t      sb;
+    const uint8_t u16[]   = { 0x00, 0x00, 0xFF, 0xFF };
+    const uint8_t i16[]   = { 0x80, 0x00, 0x7F, 0xFF };
+    const uint8_t stamp[] = { 0x07, 0xE8, 0x0C, 0x0C, 0x0E, 0x1E };
+    int           i;
+
+    sim_link_init(&s, 0xE0);
+    CHECK_EQ(sim_link_set_identity(&s, TS_FORMAT_MULTIBYTE, TS_CLASS_SENSOR,
+                                   0x00E0, "ACME", "PM-1"), RES_OK);
+    /* One reading, a batch of three, one signed, one undecodable. */
+    CHECK_EQ(sim_link_add_service(&s, 0x01, 0x21, false, 1234, u16, 4),
+             RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x02, 0x21, false, 10, u16, 4), RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x03, 0x31, false, 0xFFFE, i16, 4),
+             RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x04, 0x44, false, 0, stamp, 6),
+             RES_OK);
+    CHECK_EQ(sim_link_set_items(&s, 0x02, 3), RES_OK);
+    sim_link_bind(&s, &l);
+
+    appl_policy_defaults(&p);
+    appl_init(&a, &p);
+    for (i = 0; i < 24; i++)
+        CHECK_EQ(appl_tick(&a, &l, 0), RES_OK);
+
+    CHECK_EQ(appl_state(&a), APPL_READY);
+    CHECK_EQ(appl_sweeps(&a), 1);
+
+    sb_init(&sb, buf, sizeof(buf));
+    CHECK_EQ(payload_telemetry(&sb, "TS-1", "T", &a), RES_OK);
+    CHECK_STREQ(sb_str(&sb),
+                "{\"device_id\":\"TS-1\",\"device_time\":\"T\","
+                "\"sa_id\":224,\"online\":true,"
+                "\"attributes\":{"
+                "\"1\":1234,"
+                "\"2\":[10,11,12],"
+                "\"3\":-2,"
+                "\"4\":\"000000000000\"}}");
 }
 
 static void status_and_the_will_differ_only_in_the_timestamp(void)
@@ -333,6 +389,7 @@ void test_payload(void)
     an_offline_report_is_still_a_report();
     general_format_capabilities_are_raw();
     multibyte_capabilities_resolve_their_shape();
+    multibyte_telemetry_renders_each_shape();
     status_and_the_will_differ_only_in_the_timestamp();
     an_acknowledgement_echoes_the_tag_and_names_each_outcome();
     a_payload_that_does_not_fit_is_refused();

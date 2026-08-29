@@ -172,32 +172,104 @@ static void a_second_sweep_waits_for_its_interval(void)
 }
 
 /*
- * Polling uses the general request format. A multi-byte appliance speaks a
- * different request layout that is not implemented, so it is identified and
- * then left alone -- reporting an empty attribute set without saying why would
- * look like a device with nothing to report.
+ * A meter speaks the multi-byte request layout, and is polled through it. Its
+ * readings are wider than the two bytes a general reply carries, which is the
+ * whole reason the layout exists.
  */
-static void a_multibyte_appliance_is_identified_but_not_polled(void)
+static void a_multibyte_appliance_is_polled(void)
 {
     sim_link_t    s;
     link_t        l;
     appliance_t   a;
-    const uint8_t u16[] = { 0x00, 0x00, 0x27, 0x10 };
+    const uint8_t u16[] = { 0x00, 0x00, 0x27, 0x10 };   /* min 0, max 10000 */
+    const uint8_t u32[] = { 0x00, 0x00, 0x00, 0x00,
+                            0x00, 0x0F, 0x42, 0x40 };
+    const appl_value_t *rd;
     uint16_t      v = 0;
 
     sim_link_init(&s, 0xE0);
     CHECK_EQ(sim_link_set_identity(&s, TS_FORMAT_MULTIBYTE, TS_CLASS_SENSOR,
                                    0x00E0, "ACME", "PM-1"), RES_OK);
-    CHECK_EQ(sim_link_add_service(&s, 0x20, 0x21, false, 0, u16, 4), RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x20, 0x21, false, 1234, u16, 4),
+             RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x21, 0x22, false, 5678, u32, 8),
+             RES_OK);
     sim_link_bind(&s, &l);
     model(&a);
 
     pump(&a, &l, 0, 20);
 
-    CHECK_EQ(appl_state(&a), APPL_READY_IDENTITY_ONLY);
-    CHECK(appl_online(&a));            /* it is there, and we know what it is */
+    CHECK_EQ(appl_state(&a), APPL_READY);
+    CHECK(appl_online(&a));
     CHECK(appl_identity(&a) != NULL);
-    CHECK_EQ(appl_value(&a, 0x20, &v), RES_ENOTFOUND);
+    CHECK_EQ(appl_sweeps(&a), 1);
+
+    CHECK_EQ(appl_value(&a, 0x20, &v), RES_OK);
+    CHECK_EQ(v, 1234);
+
+    /* The wide one keeps its declared width, not the two bytes a narrow
+     * reading would have. */
+    rd = appl_reading(&a, 0x21);
+    CHECK(rd != NULL);
+    if (rd) {
+        CHECK_EQ(rd->multibyte, 1);
+        CHECK_EQ(rd->dtype, 0x22);
+        CHECK_EQ(rd->count, 1);
+        CHECK_EQ(rd->raw_len, 4);
+        CHECK_EQ(rd->raw[0], 0x00);
+        CHECK_EQ(rd->raw[1], 0x00);
+        CHECK_EQ(rd->raw[2], 0x16);
+        CHECK_EQ(rd->raw[3], 0x2E);
+    }
+}
+
+/* A write to a multi-byte appliance is echoed in the wider layout, and the
+ * model has to recognise its own value at the end of a four-byte item. */
+static void a_multibyte_write_is_recognised_when_echoed(void)
+{
+    sim_link_t    s;
+    link_t        l;
+    appliance_t   a;
+    const uint8_t u32[] = { 0x00, 0x00, 0x00, 0x00,
+                            0x00, 0x0F, 0x42, 0x40 };
+    appl_write_item_t items[1];
+    const appl_write_batch_t *b;
+    uint16_t      v = 0;
+
+    sim_link_init(&s, 0xE0);
+    CHECK_EQ(sim_link_set_identity(&s, TS_FORMAT_MULTIBYTE, TS_CLASS_SENSOR,
+                                   0x00E0, "ACME", "PM-1"), RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x21, 0x22, true, 0, u32, 8), RES_OK);
+    sim_link_bind(&s, &l);
+    model(&a);
+
+    pump(&a, &l, 0, 20);
+    CHECK_EQ(appl_state(&a), APPL_READY);
+
+    items[0].service_id = 0x21;
+    items[0].value      = 4321;
+    items[0].result     = APPL_WRITE_OK;
+    items[0].done       = false;
+
+    CHECK_EQ(appl_write_begin(&a, items, 1), RES_OK);
+    pump(&a, &l, 10, 6);
+
+    CHECK(appl_write_done(&a));
+    b = appl_write_batch(&a);
+    CHECK(b != NULL);
+    if (b) {
+        CHECK_EQ(b->n, 1);
+        CHECK_EQ(b->items[0].result, APPL_WRITE_OK);
+    }
+
+    CHECK_EQ(s.services[0].value, 4321);
+    CHECK_EQ(appl_value(&a, 0x21, &v), RES_OK);
+    CHECK_EQ(v, 4321);
+
+    /* And it is still four bytes wide, as the type says. */
+    CHECK(appl_reading(&a, 0x21) != NULL);
+    if (appl_reading(&a, 0x21))
+        CHECK_EQ(appl_reading(&a, 0x21)->raw_len, 4);
 }
 
 static void a_dropped_reply_is_retried(void)
@@ -549,7 +621,8 @@ void test_appliance(void)
     a_sweep_reads_every_capability();
     a_sweep_is_only_counted_once_it_finishes();
     a_second_sweep_waits_for_its_interval();
-    a_multibyte_appliance_is_identified_but_not_polled();
+    a_multibyte_appliance_is_polled();
+    a_multibyte_write_is_recognised_when_echoed();
     a_dropped_reply_is_retried();
     a_link_that_goes_down_invalidates_the_cache();
     repeated_failure_takes_the_appliance_down_and_backs_off();

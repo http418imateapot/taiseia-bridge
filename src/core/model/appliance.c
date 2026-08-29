@@ -4,6 +4,8 @@
  */
 #include "core/model/appliance.h"
 
+#include "core/taiseia/datatype.h"
+
 #include <string.h>
 
 void appl_policy_defaults(appl_policy_t *p)
@@ -48,7 +50,7 @@ appl_state_t appl_state(const appliance_t *a)
 
 bool appl_online(const appliance_t *a)
 {
-    return a && (a->state == APPL_READY || a->state == APPL_READY_IDENTITY_ONLY);
+    return a && a->state == APPL_READY;
 }
 
 unsigned appl_sweeps(const appliance_t *a)
@@ -85,13 +87,29 @@ result_t appl_value(const appliance_t *a, uint8_t service_id, uint16_t *out)
     return RES_ENOTFOUND;
 }
 
+const appl_value_t *appl_reading(const appliance_t *a, uint8_t service_id)
+{
+    size_t i;
+
+    if (!a)
+        return NULL;
+
+    service_id = (uint8_t)(service_id & TS_SVC_ID_MASK);
+
+    for (i = 0; i < a->n_values; i++) {
+        if (a->values[i].service_id != service_id)
+            continue;
+        return a->values[i].valid ? &a->values[i] : NULL;
+    }
+    return NULL;
+}
+
 const char *appl_state_str(appl_state_t s)
 {
     switch (s) {
     case APPL_DOWN:                return "down";
     case APPL_IDENTIFYING:         return "identifying";
     case APPL_READY:               return "ready";
-    case APPL_READY_IDENTITY_ONLY: return "ready (identity only)";
     }
     return "unknown";
 }
@@ -168,14 +186,12 @@ static void adopt_registration(appliance_t *a, int64_t now_ms)
     a->next_reregister_ms = now_ms + a->policy.reregister_interval_ms;
 
     /*
-     * Polling uses the general request format. A multi-byte-format appliance
-     * speaks a different request layout that is not implemented, so its
-     * services cannot be read -- but its identity and capabilities are known
-     * and worth publishing. Reporting an empty attribute set without saying
-     * why would look like a device with nothing to report.
+     * Both request formats are implemented, so every appliance that registers
+     * is polled. A capability whose type has no fixed width cannot survive
+     * registration decoding at all -- the record's own length depends on it --
+     * so there is no half-known appliance to represent here.
      */
-    a->state = (a->reg.format == TS_FORMAT_GENERAL) ? APPL_READY
-                                                    : APPL_READY_IDENTITY_ONLY;
+    a->state = APPL_READY;
 }
 
 /* ---------------------------------------------------------------- requests */
@@ -193,6 +209,37 @@ static result_t start(appliance_t *a, link_t *link, appl_op_t op,
     req.sa_id      = a->wire_sa_id;
     req.service_id = service_id;
     req.value      = value;
+
+    /*
+     * A multi-byte request has to state the type and its width, both of which
+     * the appliance told us at registration. Registration itself is in the
+     * general shape whatever format everything else uses.
+     */
+    if (op != APPL_OP_REGISTER && a->reg.format == TS_FORMAT_MULTIBYTE) {
+        const ts_capability_t *cap = ts_registration_find(&a->reg, service_id);
+        const ts_datatype_t   *t   = (cap && cap->dtype_known)
+                                         ? ts_datatype(cap->dtype) : NULL;
+
+        if (!t || t->value_len == 0 || t->value_len > sizeof(a->wbuf))
+            return RES_EUNSUPPORTED;
+
+        req.multibyte = true;
+        req.dtype     = cap->dtype;
+        req.value_len = t->value_len;
+
+        if (op == APPL_OP_WRITE) {
+            /* One item, big endian, high bytes zero: the command carried a
+             * two-byte value and widening it says nothing untrue. */
+            memset(a->wbuf, 0, t->value_len);
+            a->wbuf[t->value_len - 1u] = (uint8_t)(value & 0xFFu);
+            if (t->value_len >= 2u)
+                a->wbuf[t->value_len - 2u] = (uint8_t)((value >> 8) & 0xFFu);
+
+            req.count    = 1;
+            req.data     = a->wbuf;
+            req.data_len = t->value_len;
+        }
+    }
 
     switch (op) {
     case APPL_OP_REGISTER: req.op = LINK_OP_REGISTER; break;
@@ -245,21 +292,82 @@ static void note_read_failure(appliance_t *a, uint8_t service_id)
     }
 }
 
-static void note_read_success(appliance_t *a, uint8_t service_id,
-                              uint16_t value, int64_t now_ms)
+static appl_value_t *value_slot(appliance_t *a, uint8_t service_id)
 {
     size_t i;
 
     for (i = 0; i < a->n_values; i++) {
-        if (a->values[i].service_id != service_id)
-            continue;
+        if (a->values[i].service_id == service_id)
+            return &a->values[i];
+    }
+    return NULL;
+}
 
-        a->values[i].value      = value;
-        a->values[i].valid      = true;
-        a->values[i].misses     = 0;
-        a->values[i].updated_ms = now_ms;
+static void note_read_success(appliance_t *a, uint8_t service_id,
+                              uint16_t value, int64_t now_ms)
+{
+    appl_value_t *v = value_slot(a, service_id);
+
+    if (!v)
+        return;
+
+    v->value      = value;
+    v->multibyte  = false;
+    v->raw_len    = 0;
+    v->count      = 1;
+    v->valid      = true;
+    v->misses     = 0;
+    v->updated_ms = now_ms;
+}
+
+/* A reading wider than two bytes, kept as it arrived. */
+static void note_read_success_mb(appliance_t *a, const link_resp_t *resp,
+                                 int64_t now_ms)
+{
+    appl_value_t *v = value_slot(a, resp->service_id);
+
+    if (!v)
+        return;
+
+    if (resp->data_len > sizeof(v->raw)) {
+        /* Refused rather than truncated: a short batch of readings looks
+         * exactly like a complete one. */
+        v->misses++;
+        if (v->misses >= a->policy.max_misses)
+            v->valid = false;
         return;
     }
+
+    v->multibyte  = true;
+    v->dtype      = resp->dtype;
+    v->count      = resp->count;
+    v->raw_len    = resp->data_len;
+    if (resp->data_len > 0)
+        memcpy(v->raw, resp->data, resp->data_len);
+
+    /*
+     * Keep a narrow view too, for callers that only want a number: the low
+     * two bytes of the FIRST item. A batch has no single value, and the first
+     * reading is the least arbitrary answer to a question that assumes one.
+     */
+    {
+        size_t item = (resp->count > 0u &&
+                       resp->data_len % resp->count == 0u)
+                          ? resp->data_len / resp->count
+                          : resp->data_len;
+
+        if (item >= 2u)
+            v->value = (uint16_t)(((uint16_t)resp->data[item - 2u] << 8) |
+                                  resp->data[item - 1u]);
+        else if (item == 1u)
+            v->value = resp->data[0];
+        else
+            v->value = 0u;
+    }
+
+    v->valid      = true;
+    v->misses     = 0;
+    v->updated_ms = now_ms;
 }
 
 static void finish_write_item(appliance_t *a, appl_write_result_t result)
@@ -347,7 +455,9 @@ static void handle_reply(appliance_t *a, link_t *link, const link_resp_t *resp,
     }
 
     case APPL_OP_READ:
-        if (resp->data_len >= 2u) {
+        if (resp->multibyte) {
+            note_read_success_mb(a, resp, now_ms);
+        } else if (resp->data_len >= 2u) {
             uint16_t v = (uint16_t)(((uint16_t)resp->data[0] << 8) |
                                     resp->data[1]);
 
@@ -364,14 +474,24 @@ static void handle_reply(appliance_t *a, link_t *link, const link_resp_t *resp,
          * It says nothing about what a differing reply means, so this reports
          * "not taken" rather than guessing at a reason.
          */
+        /* The value sits at the end of the data field in both formats: the
+         * general one has exactly two bytes, and a widened multi-byte item
+         * has its low bytes last. */
         bool echoed = resp->write &&
                       resp->service_id == a->op_service &&
                       resp->data_len >= 2u &&
-                      resp->data[0] == (uint8_t)((a->op_value >> 8) & 0xFFu) &&
-                      resp->data[1] == (uint8_t)(a->op_value & 0xFFu);
+                      resp->data[resp->data_len - 2u] ==
+                          (uint8_t)((a->op_value >> 8) & 0xFFu) &&
+                      resp->data[resp->data_len - 1u] ==
+                          (uint8_t)(a->op_value & 0xFFu);
 
         if (echoed) {
-            note_read_success(a, a->op_service, a->op_value, now_ms);
+            /* Cache the echo in the shape it arrived in, so a service does
+             * not change shape between a write and the next sweep. */
+            if (resp->multibyte)
+                note_read_success_mb(a, resp, now_ms);
+            else
+                note_read_success(a, a->op_service, a->op_value, now_ms);
             finish_write_item(a, APPL_WRITE_OK);
         } else {
             finish_write_item(a, APPL_WRITE_NOT_TAKEN);

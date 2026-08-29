@@ -101,6 +101,7 @@ result_t sim_link_add_service(sim_link_t *s, uint8_t service_id, uint8_t dtype,
     svc->dtype       = dtype;
     svc->writable    = writable;
     svc->value       = value;
+    svc->items       = 1u;
     svc->support_len = support_len;
     memcpy(svc->support, support, support_len);
 
@@ -148,6 +149,22 @@ result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to)
 
     svc->clamps   = true;
     svc->clamp_to = to;
+
+    return RES_OK;
+}
+
+result_t sim_link_set_items(sim_link_t *s, uint8_t service_id, uint16_t n)
+{
+    sim_service_t *svc;
+
+    if (!s || n == 0u)
+        return RES_EINVAL;
+
+    svc = find_service(s, (uint8_t)(service_id & TS_SVC_ID_MASK));
+    if (!svc)
+        return RES_ENOTFOUND;
+
+    svc->items = n;
 
     return RES_OK;
 }
@@ -231,6 +248,8 @@ static result_t deliver(sim_link_t *s, uint32_t req_id, uint8_t *pkt,
 {
     ts_frame_t f;
     result_t   r;
+    bool       mb = (s->format == TS_FORMAT_MULTIBYTE) &&
+                    (pkt[1] != (uint8_t)TS_SA_ID_REGISTRATION);
 
     if (s->corrupt_next) {
         pkt[len - 1u] = (uint8_t)(pkt[len - 1u] ^ 0xFFu);
@@ -240,6 +259,31 @@ static result_t deliver(sim_link_t *s, uint32_t req_id, uint8_t *pkt,
     memset(&s->pending, 0, sizeof(s->pending));
     s->pending.id   = req_id;
     s->have_pending = true;
+
+    if (mb) {
+        ts_mb_frame_t m;
+
+        r = ts_parse_mb_response(pkt, len, &m);
+        if (r != RES_OK) {
+            s->pending.status = r;
+            return RES_OK;
+        }
+        if (m.data_len > sizeof(s->pending.data)) {
+            s->pending.status = RES_ETOOBIG;
+            return RES_OK;
+        }
+        s->pending.status     = RES_OK;
+        s->pending.sa_id      = m.sa_id;
+        s->pending.service_id = m.service_id;
+        s->pending.write      = m.write;
+        s->pending.multibyte  = true;
+        s->pending.dtype      = m.dtype;
+        s->pending.count      = m.count;
+        s->pending.data_len   = m.data_len;
+        if (m.data_len > 0)
+            memcpy(s->pending.data, m.data, m.data_len);
+        return RES_OK;
+    }
 
     r = ts_parse_response(pkt, len, &f);
     if (r != RES_OK) {
@@ -321,15 +365,77 @@ static result_t reply_service(sim_link_t *s, uint32_t req_id,
     return deliver(s, req_id, pkt, TS_GENERAL_REQ_LEN);
 }
 
+/*
+ * The multi-byte answer: one item, the stored value widened to the declared
+ * type. A write is echoed back exactly, since that is what this protocol
+ * defines success as.
+ */
+static result_t reply_service_mb(sim_link_t *s, uint32_t req_id,
+                                 const sim_service_t *svc, bool write,
+                                 const uint8_t *wdata, size_t wlen,
+                                 uint16_t wcount)
+{
+    uint8_t              pkt[TS_FRAME_MAX_LEN];
+    uint8_t              item[TS_SUPPORT_MAX_BYTES];
+    uint8_t              batch[TS_FRAME_MAX_LEN - TS_MB_OVERHEAD];
+    const ts_datatype_t *dt = ts_datatype(svc->dtype);
+    size_t               n = 0;
+    uint16_t             i;
+    result_t             r;
+
+    if (!dt || dt->value_len == 0 || dt->value_len > sizeof(item))
+        return RES_EUNSUPPORTED;
+
+    if (write) {
+        r = ts_build_mb_write(pkt, sizeof(pkt), &n,
+                              (uint8_t)(s->sa_id & 0xFFu), svc->service_id,
+                              svc->dtype, wcount, wdata, wlen);
+        if (r != RES_OK)
+            return r;
+        return deliver(s, req_id, pkt, n);
+    }
+
+    /* Big endian, high bytes zero. Widening a narrow stored value is not a
+     * lie about the value, only about its precision. */
+    memset(item, 0, dt->value_len);
+    item[dt->value_len - 1u] = (uint8_t)(svc->value & 0xFFu);
+    if (dt->value_len >= 2u)
+        item[dt->value_len - 2u] = (uint8_t)((svc->value >> 8) & 0xFFu);
+
+    /* A read asks for whatever the appliance has, so a service may answer
+     * with a batch. Each copy differs by its index, so a caller that
+     * mis-slices the batch cannot get away with it. */
+    for (i = 0; i < svc->items; i++) {
+        if ((i + 1u) * dt->value_len > sizeof(batch))
+            return RES_ETOOBIG;
+        memcpy(batch + i * dt->value_len, item, dt->value_len);
+        batch[(i + 1u) * dt->value_len - 1u] =
+            (uint8_t)((item[dt->value_len - 1u] + i) & 0xFFu);
+    }
+
+    r = ts_build_mb_write(pkt, sizeof(pkt), &n, (uint8_t)(s->sa_id & 0xFFu),
+                          svc->service_id, svc->dtype, svc->items, batch,
+                          (size_t)svc->items * dt->value_len);
+    if (r != RES_OK)
+        return r;
+
+    /* A reply to a read does not carry the write bit. */
+    pkt[2] = (uint8_t)(pkt[2] & TS_SVC_ID_MASK);
+    pkt[n - 1u] = ts_checksum(pkt, n - 1u);
+
+    return deliver(s, req_id, pkt, n);
+}
+
 /* --------------------------------------------------------------------- port */
 
 static result_t sim_submit(void *self, const link_req_t *req)
 {
     sim_link_t   *s = (sim_link_t *)self;
-    uint8_t       wire[TS_GENERAL_REQ_LEN];
+    uint8_t       wire[TS_FRAME_MAX_LEN];
     size_t        wire_len = 0;
     ts_frame_t    in;
     sim_service_t *svc;
+    bool          multibyte;
     result_t      r;
 
     if (!s || !req)
@@ -341,26 +447,35 @@ static result_t sim_submit(void *self, const link_req_t *req)
 
     /* Encode the request as bytes and decode it again, so the simulator sees
      * only what a real appliance would see. */
+    /* Registration is in the general shape whatever format the appliance uses
+     * for everything else. */
+    multibyte = req->multibyte && req->op != LINK_OP_REGISTER;
+
     switch (req->op) {
     case LINK_OP_READ:
-        r = ts_build_read(wire, sizeof(wire), &wire_len,
-                          req->sa_id, req->service_id);
+        if (multibyte)
+            r = ts_build_mb_read(wire, sizeof(wire), &wire_len, req->sa_id,
+                                 req->service_id, req->dtype, req->value_len);
+        else
+            r = ts_build_read(wire, sizeof(wire), &wire_len,
+                              req->sa_id, req->service_id);
         break;
     case LINK_OP_REGISTER:
         r = ts_build_read(wire, sizeof(wire), &wire_len,
                           (uint8_t)TS_SA_ID_REGISTRATION, 0u);
         break;
     case LINK_OP_WRITE:
-        r = ts_build_write(wire, sizeof(wire), &wire_len,
-                           req->sa_id, req->service_id, req->value);
+        if (multibyte)
+            r = ts_build_mb_write(wire, sizeof(wire), &wire_len, req->sa_id,
+                                  req->service_id, req->dtype, req->count,
+                                  req->data, req->data_len);
+        else
+            r = ts_build_write(wire, sizeof(wire), &wire_len,
+                               req->sa_id, req->service_id, req->value);
         break;
     default:
         return RES_EINVAL;
     }
-    if (r != RES_OK)
-        return r;
-
-    r = ts_parse_request(wire, wire_len, &in);
     if (r != RES_OK)
         return r;
 
@@ -372,6 +487,39 @@ static result_t sim_submit(void *self, const link_req_t *req)
 
     if (req->op == LINK_OP_REGISTER)
         return reply_registration(s, req->id);
+
+    if (multibyte) {
+        ts_mb_frame_t mb;
+
+        /* A request and a reply share the multi-byte layout, so one parser
+         * serves both directions. */
+        r = ts_parse_mb_response(wire, wire_len, &mb);
+        if (r != RES_OK)
+            return r;
+
+        svc = find_service(s, mb.service_id);
+        if (!svc) {
+            fail(s, req->id, RES_ENOTFOUND);
+            return RES_OK;
+        }
+        if (mb.write && !svc->writable) {
+            fail(s, req->id, RES_EUNSUPPORTED);
+            return RES_OK;
+        }
+        if (mb.write && mb.data_len >= 2u) {
+            uint16_t v = (uint16_t)(((uint16_t)mb.data[mb.data_len - 2u] << 8) |
+                                    mb.data[mb.data_len - 1u]);
+
+            svc->value = svc->clamps ? svc->clamp_to : v;
+        }
+
+        return reply_service_mb(s, req->id, svc, mb.write, mb.data,
+                                mb.data_len, mb.count);
+    }
+
+    r = ts_parse_request(wire, wire_len, &in);
+    if (r != RES_OK)
+        return r;
 
     svc = find_service(s, in.service_id);
     if (!svc) {
