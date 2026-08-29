@@ -49,10 +49,14 @@ extern int g_failures;
         }                                                                    \
     } while (0)
 
+void test_json(void);
 void test_frame(void);
 void test_datatype(void);
 void test_registration(void);
 void test_sim_link(void);
 void test_appliance(void);
+void test_payload(void);
+void test_config(void);
+void test_mqtt(void);
 
 #endif /* TSB_TESTS_H */

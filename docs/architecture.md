@@ -132,7 +132,8 @@ processes.
 ```
 src/core/taiseia/   framing, checksums, data types, registration, limits
 src/core/model/     appliance state, capability cache, sweep scheduling, writes
-src/core/util/      result type, and the small primitives built on it
+src/core/mqtt/      MQTT 3.1.1 codec, topic templates, payloads, configuration
+src/core/util/      result type, bounded string builder, JSON reader and writer
 src/ports/          interfaces: appliance_link, serial
 src/adapters/sim/   a simulated appliance, including fault injection
 src/adapters/       posix, win32                        (none today)
@@ -143,9 +144,10 @@ cmake/              the freestanding check
 
 ## 8. What is not built yet
 
-MQTT, configuration, the serial adapters, and both applications. The southbound
-half -- framing, data types, registration, the appliance model and the
-simulator -- is in place and tested; the northbound half is not.
+The MQTT client that opens a socket and drives the codec, a socket port, the
+serial adapters, and both applications. Everything that is a pure function --
+southbound framing and the appliance model, northbound codec, topics, payloads
+and configuration -- is in place and tested. What remains is the I/O around it.
 
 Two protocol gaps are detected and refused rather than half-handled: the
 multi-byte request layout (so those appliances are identified but not polled)
