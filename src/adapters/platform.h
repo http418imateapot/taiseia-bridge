@@ -15,6 +15,7 @@
 #define TSB_ADAPTERS_PLATFORM_H
 
 #include "core/util/result.h"
+#include "ports/serial.h"
 #include "ports/socket.h"
 
 #include <stdarg.h>
@@ -86,5 +87,14 @@ typedef struct {
 
 /** Bind `out` to `s`, which the caller owns and keeps alive. */
 void platform_socket_bind(platform_socket_t *s, socket_t *out);
+
+/* ------------------------------------------------------------- serial ports */
+
+typedef struct {
+    /* A file descriptor on POSIX, a HANDLE on Windows. Negative means closed. */
+    intptr_t handle;
+} platform_serial_t;
+
+void platform_serial_bind(platform_serial_t *s, serial_t *out);
 
 #endif /* TSB_ADAPTERS_PLATFORM_H */

@@ -74,6 +74,7 @@ add_library(tsb_core STATIC
     src/core/mqtt/codec.c
     src/core/mqtt/client.c
     src/ports/appliance_link.c
+    src/ports/serial.c
     src/ports/socket.c)
 target_include_directories(tsb_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(tsb_core PRIVATE tsb_warnings)
@@ -83,16 +84,25 @@ add_library(tsb_sim STATIC
     src/adapters/sim/sim_link.c)
 target_link_libraries(tsb_sim PUBLIC tsb_core PRIVATE tsb_warnings)
 
+# The appliance link over a real UART. No platform dependency: it takes its
+# clock as a parameter, which is also what makes both of its deadlines
+# testable by passing numbers.
+add_library(tsb_uart STATIC
+    src/adapters/taiseia_uart/uart_link.c)
+target_link_libraries(tsb_uart PUBLIC tsb_core PRIVATE tsb_warnings)
+
 # The platform layer: one seam, two implementations, no #ifdef above it.
 if(WIN32)
     add_library(tsb_platform STATIC
         src/adapters/platform_log.c
-        src/adapters/win32/platform_win32.c)
+        src/adapters/win32/platform_win32.c
+        src/adapters/win32/serial_win32.c)
     target_link_libraries(tsb_platform PUBLIC tsb_core ws2_32)
 else()
     add_library(tsb_platform STATIC
         src/adapters/platform_log.c
-        src/adapters/posix/platform_posix.c)
+        src/adapters/posix/platform_posix.c
+        src/adapters/posix/serial_posix.c)
     target_link_libraries(tsb_platform PUBLIC tsb_core)
 endif()
 target_link_libraries(tsb_platform PRIVATE tsb_warnings)
@@ -113,9 +123,10 @@ if(TSB_BUILD_TESTS)
         tests/test_config.c
         tests/test_mqtt.c
         tests/test_client.c
-        tests/test_platform.c)
+        tests/test_platform.c
+        tests/test_uart.c)
     target_include_directories(tsb_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    target_link_libraries(tsb_tests PRIVATE tsb_sim tsb_platform tsb_warnings)
+    target_link_libraries(tsb_tests PRIVATE tsb_sim tsb_uart tsb_platform tsb_warnings)
 
     add_test(NAME unit COMMAND tsb_tests)
 
