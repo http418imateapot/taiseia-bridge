@@ -148,22 +148,26 @@ src/adapters/sim/           a simulated appliance, with fault injection
 src/adapters/taiseia_uart/  the appliance link over a real UART
 src/adapters/posix/         sockets, serial, time
 src/adapters/win32/         sockets, serial, time
-src/apps/                   bridge, cli                 (none today)
+src/apps/bridge/            the loop
+src/apps/cli/               one exchange at a time, by hand
 tests/              host tests; no platform, no hardware
 cmake/              the freestanding check
 ```
 
 ## 8. What is not built yet
 
-The two applications: the bridge that wires these pieces into a loop, and the
-command-line tool that talks to an appliance by hand.
+Nothing structural. What remains is either a protocol gap that is detected and
+refused rather than half-handled, or a verification gap:
 
-Everything below them is built and tested -- the protocol, the appliance model,
-the MQTT codec and client, configuration, and both platforms' sockets, serial
-ports, clocks and logging. What is left is composition, not mechanism.
-
-Two protocol gaps remain detected and refused rather than half-handled: the
-multi-byte request layout, and fragmented registration replies.
+- **The multi-byte request layout.** Those appliances are identified and then
+  left alone, in a state of their own, so an empty attribute set is never
+  mistaken for a device with nothing to report.
+- **Fragmented registration replies.** Detected and refused; reassembly is not
+  implemented.
+- **TLS.** Refused at startup rather than downgraded — see
+  [adr/0008](adr/0008-no-tls.md).
+- **No physical appliance, no real broker, and no real serial port** has ever
+  been connected to any of this. See [testing.md](testing.md).
 
 Two protocol gaps are detected and refused rather than half-handled: the
 multi-byte request layout (so those appliances are identified but not polled)

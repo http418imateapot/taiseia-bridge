@@ -20,6 +20,16 @@ Two CTest cases run in each:
   which fails the build if `src/core` or `src/ports` grows a platform
   dependency
 
+And then a smoke test: the whole program, against the simulator, with the
+payloads going to the log. The unit tests prove the pieces; this proves they
+were wired together, and on Linux it runs under AddressSanitizer so the
+composed program is checked and not just its parts.
+
+It has already earned its place. The unit tests were green while the bridge
+published `"online":true` with an empty attribute set, because it reported the
+moment the appliance was identified rather than once anything had been read
+from it. Nothing that tests one piece at a time was ever going to notice.
+
 ## What has not been verified
 
 **No physical appliance has ever been connected to this code.** Nothing here
@@ -29,6 +39,9 @@ establishes that:
 - a USB-to-UART adapter meets the 30 ms inter-byte ceiling on any particular
   operating system;
 - any specific device's registration payload parses;
+- the serial adapters work at all -- nothing in CI opens a serial port, so
+  they are exercised only through the port interface by a fake;
+- the MQTT client can talk to a real broker;
 - the protocol has been read correctly at all.
 
 That last one deserves saying twice. The simulator is written from the same

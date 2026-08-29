@@ -25,7 +25,7 @@ plus what the platform already provides.
 
 ---
 
-## Status — early development
+## Status
 
 | | |
 |---|---|
@@ -37,7 +37,7 @@ plus what the platform already provides.
 | MQTT client, socket port | built, tested |
 | Platform adapters: sockets, serial, time, logging | built, tested |
 | TaiSEIA UART link adapter | built, tested |
-| The two applications | not started |
+| The two applications | built, smoke-tested |
 | Serial adapters (POSIX, Windows) | not started |
 
 **No physical appliance has ever been connected to this code.** Verification is
@@ -73,6 +73,44 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 ```bash
 ctest --test-dir build --output-on-failure
 ```
+
+## Running it, with no hardware and no broker
+
+```bash
+./build/taiseia-bridge --link sim -c examples/config/simulator.conf
+```
+
+With no broker configured the payloads go to the log instead of a socket, so
+the whole path is visible:
+
+```
+info  taiseia-bridge 0.1.0-dev starting as SIM-0001
+info  v1/from/device/SIM-0001/status {"device_id":"SIM-0001",...,"online":true}
+info  v1/from/device/SIM-0001/telemetry {...,"sa_id":4,"online":true,
+      "attributes":{"0":1,"3":55,"7":62}}
+info  v1/from/device/SIM-0001/capabilities {...,"format":"general",
+      "make":"SIMULATOR","model":"SIM-0001","capabilities":[...]}
+```
+
+One exchange at a time, through the same adapter the bridge uses:
+
+```bash
+./build/taiseia-cli --link sim identify
+```
+
+```bash
+./build/taiseia-cli --port /dev/ttyUSB0 read 4 7
+```
+
+## Running it for real
+
+```bash
+./build/taiseia-bridge -c examples/config/appliance.conf
+```
+
+Every value in that file is a property of one deployment, which is why none of
+them is compiled in. Set `serial_port`, `mqtt_host` and `device_id` at minimum;
+the file documents the rest inline.
 
 ---
 
