@@ -12,4 +12,6 @@
 *.yml  text eol=lf
 *.conf text eol=lf
 *.cmake text eol=lf
+*.py   text eol=lf
+Makefile text eol=lf
 CMakeLists.txt text eol=lf
