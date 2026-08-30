@@ -153,7 +153,15 @@ src/apps/bridge/            the loop
 src/apps/cli/               one exchange at a time, by hand
 tests/              host tests; no platform, no hardware
 cmake/              the freestanding check
+lab/                the expected values, and the decisions behind them --
+                    Python, builds nothing, nothing in src/ depends on it
 ```
+
+`lab/` is outside the layering above and outside the freestanding rule, because
+it is not part of the program. It checks whether what the tests expect is right,
+which is a question the tests cannot ask themselves. See
+[verification.md](verification.md) and
+[adr/0013](adr/0013-oracle-before-code.md).
 
 ## 8. What is not built yet
 

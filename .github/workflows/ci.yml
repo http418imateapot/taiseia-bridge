@@ -43,6 +43,52 @@ jobs:
           sudo systemctl stop mosquitto 2>/dev/null || true
           ./scripts/integration-broker.sh ./build/taiseia-bridge
 
+  # The tests establish that this program does what we expect. This job asks
+  # whether what we expect is right, and whether the source says it rather than
+  # the compiler happening to. See docs/verification.md.
+  verify:
+    name: linux / oracle and proofs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: install the solver and the model checker
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cbmc
+          python3 -m pip install --quiet z3-solver
+
+      # Whatever these report is what may be quoted. Nothing is cited from
+      # memory -- see AGENTS.md.
+      - name: versions
+        run: |
+          cbmc --version
+          python3 --version
+          python3 -c "import z3; print('z3', z3.get_version_string())"
+
+      # Two independent transcriptions of the same equations, compared cell by
+      # cell. Non-zero exit means one of them is wrong, and nothing downstream
+      # is worth running until that is settled.
+      - name: the oracle agrees with itself
+        run: python3 -m lab.oracle
+
+      # And the C agrees with the oracle, for every input rather than for the
+      # inputs somebody listed.
+      - name: the implementation agrees with the oracle
+        run: make -C lab/proofs verify
+
+      # A clean run here is the failure: the demonstration is that CBMC rejects
+      # the obvious way of writing sign extension, which every test passes.
+      - name: and the obvious version is rejected
+        run: make -C lab/proofs demo
+
+      - name: keep the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proofs
+          path: lab/results/
+
   linux-release:
     name: linux / gcc / release, no sanitizers
     runs-on: ubuntu-latest
