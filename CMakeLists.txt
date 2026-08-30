@@ -70,6 +70,7 @@ add_library(tsb_core STATIC
     src/core/util/jsonr.c
     src/core/taiseia/frame.c
     src/core/taiseia/datatype.c
+    src/core/taiseia/general.c
     src/core/taiseia/registration.c
     src/core/taiseia/reassembly.c
     src/core/model/appliance.c
@@ -133,6 +134,7 @@ if(TSB_BUILD_TESTS)
         tests/test_frame_mb.c
         tests/test_reassembly.c
         tests/test_datatype.c
+        tests/test_general.c
         tests/test_registration.c
         tests/test_sim_link.c
         tests/test_appliance.c
