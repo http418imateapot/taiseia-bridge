@@ -13,15 +13,15 @@ of that are worth attacking separately, and they need different tools.
 |---|---|---|
 | this program, this machine, these inputs, this run | the unit tests, the simulator, the broker and pty tests | `tests/`, CI |
 | every value in a domain agrees with an oracle that has itself been checked | enumeration, cross-checked by a solver | `lab/` |
-| every input agrees, including ones nobody enumerated | bounded model checking | not built — see below |
+| inputs within the declared target model and object bounds agree | bounded model checking | `lab/proofs/`; results require a cited CI run |
 
 Rows two and three are worth having only if the oracle in row two is right, which
 is why `lab/` spends most of its effort on the oracle rather than on the program.
 
 ## What `lab/` is
 
-`lab/` checks expected values. It is Python, it compiles nothing, it ships
-nothing, and no part of `src/` depends on it. Start at
+`lab/` checks expected values with Python and independent C experiments/proofs
+compiled in CI. It ships nothing, and no part of `src/` depends on it. Start at
 [lab/docs/oracle-audit.md](../lab/docs/oracle-audit.md), which inventories every
 place this project's expected values are a decision somebody made rather than a
 fact the standard settles.
@@ -56,28 +56,30 @@ changes no behaviour and the existing tests are its regression guard.
 
 It is checked twice, and the two checks establish different things:
 
-- `tests/test_general.c` walks the same 80 cells exhaustively in C. Its counts
-  must equal `lab/results/matrix.json`.
+- `tests/test_general.c` walks the same 80 cells exhaustively in C.
+  `lab/subject/experiment.c` additionally emits measured counts for all 80 cells
+  and 40 exactness rows, which `lab/paper.py` compares against the Python run.
 - `lab/proofs/` compares it against a third transcription of the equations for
-  *arbitrary* inputs under CBMC, with conversion and overflow checks on. Not more
-  coverage — the test already covers every input — but a different claim, because
-  the test runs one compilation and C99 leaves signed conversion
-  implementation-defined precisely where sign extension needs it.
+  arbitrary modeled inputs under CBMC, with conversion and overflow checks on.
+  This claim is bounded by CBMC's target machine model, object capacities and
+  stated assumptions; it is not a proof for every C99 implementation.
 
 `lab/proofs/naive.c` keeps the obvious way of writing those conversions, so that
-gap is demonstrable rather than argued: it passes every test in this repository,
-and `make -C lab/proofs demo` expects CBMC to reject it.
+gap is directly checkable: `make -C lab/proofs demo` requires CBMC to report both
+specific signed-conversion counterexamples. Implementation-defined conversion
+is not itself undefined behavior; tool failures do not count as counterexamples.
 
 **None of it has been run on the machine it was written on** — no compiler, no
-CBMC. It runs in the `verify` CI job, and `lab/results/proofs/` is empty until
-that job has run. See [ADR 0010](adr/0010-verification-without-hardware.md) and
+CBMC. It runs in the `verify` CI job, which publishes `r21-evidence`. Reviewed
+results are committed under `lab/results/r21/`. See [ADR 0010](adr/0010-verification-without-hardware.md) and
 [lab/docs/proofs.md](../lab/docs/proofs.md).
 
 ## What has still not been done
 
-- **The loader and the port from ADR 0014.** The codec takes a type code; nothing
-  yet supplies one from an operator's map, so the two harnesses that would prove
-  a loader safe on arbitrary input do not exist.
+- **Production metadata integration from ADR 0014.** A loader, port and typed
+  read/write path now exist as a lab-only research subject, with eleven proof
+  entries. They are not connected to the production application. See the
+  [R21 comparison](../lab/docs/paper-r21.md).
 - **The write path.** `appliance.c` widens a command value by zero-filling, which
   is the same layout question one layer up. See D1 in the
   [audit](../lab/docs/oracle-audit.md).

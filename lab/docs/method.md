@@ -1,5 +1,10 @@
 # Checking an expected value before trusting it
 
+This is the original oracle-method narrative. Its six internal steps predate
+R21; for the manuscript's step numbers and executable mapping use
+[paper-r21.md](paper-r21.md). In R21, applying the checked oracle to C is step 5
+and comparing official test-design scope is step 6.
+
 A test suite is a set of claims of the form "this input should produce that
 output". The suite can check the first half. It cannot check the second, because
 the expected value is the thing it is checking against. Where the expected value

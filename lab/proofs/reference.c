@@ -2,7 +2,7 @@
  * Copyright 2026 Calvin
  * SPDX-License-Identifier: Apache-2.0
  *
- * Structured to mirror lab/oracle/*.py, not src/core/taiseia/general.c.
+ * Structured to mirror the Python oracle modules, not the production codec.
  */
 #include "reference.h"
 
