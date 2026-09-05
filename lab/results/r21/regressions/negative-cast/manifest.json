@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "started_utc": "2026-09-05T01:01:58.823369+00:00",
+  "commit": "cd915c6b85e1e94ab664bf537b16fb9ec24c08da",
+  "dirty": false,
+  "python": "3.14.7",
+  "platform": "Linux",
+  "machine": "x86_64",
+  "ci_run_url": "https://github.com/http418imateapot/taiseia-bridge/actions/runs/33934868684",
+  "source_hash_format": "sha256 with LF newlines",
+  "sources": {
+    ".github/workflows/ci.yml": "a4c62c4953e1ef46fbb6220eed9042324615910b35e650337cbfa37b588104c6",
+    "lab/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lab/evidence.py": "eff836f1ed92cb77b01bf4c594f7d1cd2c3bfb1582f48c5268222cd628a200b6",
+    "lab/oracle/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lab/oracle/__main__.py": "24e7bc2289ee9b9c95b51fb8b3b1e10ed0262e273b9205b81bf5a44ed6b91c4f",
+    "lab/oracle/agree.py": "fb084976b25ce4a81aafa7b2c2eb2c561ce3cd892c7ad8b0a9c003a20a57a7f8",
+    "lab/oracle/layouts.py": "41228900d0d1bfa62845fbc5fb53e3d8ea50716dc44d7f38d75bedf65ef07961",
+    "lab/oracle/readings.py": "01b02ef51888021247809c41b53d0e2ef6e03a70d785639cac146235d18018e5",
+    "lab/oracle/sensitivity.py": "fb0ddba2742b44e4f4597b9d46493eadcb24ae4a64dbb43bdc66b51940fb8534",
+    "lab/oracle/smt.py": "93b52d7e0567882101a0876283860c8e3347ddd649e0dd8c9c47931e59c8c866",
+    "lab/oracle/sweep.py": "42a2ddeed5775a364e611a011c809bdf28aee1f7753c485ad38cc1eb60ae72c4",
+    "lab/oracle/types.py": "2c8d5dcd0e9745bcc68e57ccd0502a2bdde035f904cfa5d27b48bf09a505956e",
+    "lab/paper.py": "afed3090733616f36f2107b1df4bd54c1910b20ed87b0786205b3f237730f483",
+    "lab/proofs/Makefile": "b3e7985760643f18ce1744903e0d2208d529505b1cf90e4fa7c457d17c59a1b4",
+    "lab/proofs/h_decode.c": "a71eff91a73f308a20e56f07520bb75b23a746168f77a418e84401b52e240b36",
+    "lab/proofs/h_encode.c": "fc6c627d96e1a7f8e0773d7c44f045d84c35ee70957b5defc0eccfb37f2513a8",
+    "lab/proofs/h_metadata.c": "0e2993002859a3b9a64677b5f0ed06066d5e7497c727fe271cd84e6c7643ac0a",
+    "lab/proofs/h_naive.c": "3f6744d8b33baa415c39a9b4506af1a48970b99f50d530103654507a72d0e0f3",
+    "lab/proofs/h_roundtrip.c": "d4a2138a4d7cd4a35146a839fa7f0662c112d91190cdd8a23bd6b9b1f4a6e7da",
+    "lab/proofs/naive.c": "47f3dca3507406a5c2123d5c5e1fbf370d84ed260ae9bee7f0bd3290edb84878",
+    "lab/proofs/naive.h": "4e4adc37451e64d5dbdec7954cacabe8d2617a7dbdd5c276f98082c0bf3ea0d5",
+    "lab/proofs/reference.c": "2ad2e3534279ff7d7553a25026e299b2a9a17a33bc3156cfc850ac656aa1a64c",
+    "lab/proofs/reference.h": "1ad88908bfeb02214b02fdabc15686502685ef8a617ad4ca8f04eda1b27ed810",
+    "lab/proofs/run.py": "16c117dfafdf1c4abb71612659c2463c616f4dd8203a9f21dd994480903691b2",
+    "lab/requirements.txt": "c4fec4123128acee0d5e620acc108c6be1ebf22203ba0510537277930ca7894d",
+    "lab/run.py": "f6356a026c3fc0c795f991ed85eb0caefc48373e16e93addbb928221f66bb039",
+    "lab/subject/experiment.c": "acd5a533c00cd70b1be86b096d4435e423c20f1e8bd5f9e851efbe86f8a24f0a",
+    "lab/subject/metadata.c": "e3e7ccf48c32fa8b02896b60375717ab9a2d06e63892bc5f8dc9a6f98c1e496b",
+    "lab/subject/metadata.h": "e438dede67ba2134728fb8b8d1949a606e66317f9907de31d25bceab58896a02",
+    "lab/tests/test_evidence.py": "c5a857211601564ccc5ae3e1e54a7c6af1594dca7e5fa8c511215e5c41cfc19c",
+    "scripts/install.ps1": "62bd60777d7e84c499271036d7e4943113ff999390a2d7e633314bcfa2b428ff",
+    "scripts/install.py": "7389f0e0a770ed475e1042f67723f538fea88e82abb08d7cfdcfcf5de1ed3eca",
+    "src/core/taiseia/datatype.c": "d81f254473f7809f3d19854b19cf7659573a4627ab9b2e364cf5598ab66142d6",
+    "src/core/taiseia/datatype.h": "fda898970b6df24a3ce2a45aaaaba211208c5d1b873d3bbd05e17a814063704a",
+    "src/core/taiseia/frame.c": "6df580335448cdb534f9e075d2873c1b8bd2b27932f09f6189bb29ba17cc3ae3",
+    "src/core/taiseia/frame.h": "5b20a3b309158752b5b3516f89b000b529f3bb679a632adb3daa7e37cb7769c1",
+    "src/core/taiseia/general.c": "22a2e52207a949a315f09e1f7b31b1e8765d4dde73b10bc3d6b1d0a6cbbfceb9",
+    "src/core/taiseia/general.h": "2b43c5d7f1282090bdb3a53b8f717bfcac0329aecd078ac8e8da45177c9327e6",
+    "src/core/taiseia/limits.h": "e720633a8fba3aa4c2688453e5b953a032c672ac842587001793cdd6854e60da",
+    "src/core/taiseia/reassembly.c": "46ff9801a46ed4a7220f2b22a192a63d2a5a95c7581b654e88f470ba499d849d",
+    "src/core/taiseia/reassembly.h": "094e7baa7e5dc72c0ca76858146c7a32c3f2e9f7f2c454a7a022bb260f84ae6b",
+    "src/core/taiseia/registration.c": "62d524dcdf6c3daaa199d1ae8f0ac190ce2180a497e2605598e02ba8ff254792",
+    "src/core/taiseia/registration.h": "e3b5be64a3296cf1bf935628e020b932d5b0736bad6fb6f5f6e21dec29449ac3"
+  },
+  "stages": [
+    {
+      "name": "unit",
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "lab/tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "elapsed_s": 0.757
+    },
+    {
+      "name": "oracle",
+      "command": [
+        "python",
+        "-m",
+        "lab.oracle"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "elapsed_s": 10.724
+    },
+    {
+      "name": "c-experiment",
+      "command": [
+        "lab-experiment"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "elapsed_s": 2.501
+    },
+    {
+      "name": "paper",
+      "command": [
+        "python",
+        "-m",
+        "lab.paper",
+        "--results",
+        "./out/r21",
+        "--c-result",
+        "./out/r21/c-experiment.json"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "elapsed_s": 0.064
+    },
+    {
+      "name": "proofs",
+      "command": [
+        "python",
+        "-m",
+        "lab.proofs.run",
+        "--cbmc",
+        "cbmc",
+        "--output",
+        "./out/r21/proofs"
+      ],
+      "exit_code": 1,
+      "status": "failed",
+      "elapsed_s": 12.748
+    }
+  ],
+  "status": "failed",
+  "c_binary_sha256": "270d67c170b78220acb47db2d6d89f9ab68b4d9d8b0893c11a049e4bee3fd39b",
+  "finished_utc": "2026-09-05T01:02:25.620638+00:00"
+}

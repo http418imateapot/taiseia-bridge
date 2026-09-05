@@ -1,0 +1,7 @@
+{
+  "source_run": 33934868684,
+  "status": "expected historical failure before fix",
+  "source_commit": "cd915c6b85e1e94ab664bf537b16fb9ec24c08da",
+  "original_sha256": "cf91ccd510b6ce6627833e158f9c69035129a96d8212d212276b6c49ee72a701",
+  "scope": "Only the encode counterexample is archived here; full run remains a CI artifact."
+}

@@ -1,5 +1,10 @@
 # Proof logs
 
+The reviewed R21 run is now stored in [../r21/](../r21/README.md), including
+losslessly compressed raw CBMC output. This directory remains the output of
+standalone `make verify` / `make demo` commands; the older description below
+records the original, pre-R21 setup.
+
 Empty until CI has run. The machine this project is written on has no compiler
 and no CBMC, so nothing here can be produced locally — see
 [ADR 0010](../../../docs/adr/0010-verification-without-hardware.md).
