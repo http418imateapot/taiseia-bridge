@@ -30,9 +30,8 @@ from lab.oracle.layouts import LAYOUTS
 from lab.oracle.readings import READINGS
 from lab.oracle.sweep import exactness, misread
 from lab.oracle.types import carryable_types
+from lab.evidence import RESULTS
 
-RESULTS = os.path.join(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))), "results")
 
 
 def profile(t):

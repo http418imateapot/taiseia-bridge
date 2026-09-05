@@ -175,6 +175,25 @@ Both are cheap and neither changes behaviour.
 
 ## Summary
 
+### R21 follow-up (2026-09-05)
+
+The R21 manuscript adopts the two-byte INT16 interpretation explicitly (B2).
+This lab retains that premise and tests its sensitivity; it does not claim to
+resolve the standard. The request-side A/B rules are extended to service
+responses as a modeling assumption, since the manuscript itself describes the
+response wording as less explicit (A2). Neither a solver nor enumeration can
+confirm that interpretive step.
+
+The missing metadata port, config loader and three response examples are now
+available as a **lab-only research subject**, not production integration.
+See [paper-r21.md](paper-r21.md) for the complete mapping and assumptions.
+Its arbitrary-adapter proof quantifies over return values, not memory-unsafe
+callback implementations. Its registration adapter consumes already decoded
+typed records and never infers types from general-format support bytes.
+
+Evidence gates now reject SMT unknown, incomplete/duplicate grids, stale source
+fingerprints, and CBMC tool errors in place of expected counterexamples.
+
 | | Entry | Documented | Sweepable | Swept |
 |---|---|---|---|---|
 | A1 | registration continuation | yes, three places | yes | no |

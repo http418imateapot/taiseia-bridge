@@ -1,79 +1,77 @@
-# Copyright 2026 Calvin
-# SPDX-License-Identifier: Apache-2.0
-"""
-Do the transcriptions agree, cell by cell?
-
-This is the step the method turns on. Two transcriptions of the same prose,
-written against different evaluators, are compared on every cell; any
-disagreement is a defect in at least one of them and is reported before either
-is used to judge an implementation.
-
-It exits non-zero on any disagreement, so it can be the thing CI runs.
-"""
+"""Fail closed on incomplete, stale, duplicated or contradictory evidence."""
 
 import json
 import os
 import sys
 
-RESULTS = os.path.join(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))), "results")
+from lab.evidence import RESULTS, source_hashes
+from lab.oracle.layouts import LAYOUTS
+from lab.oracle.readings import READINGS
+from lab.oracle.types import carryable_types
 
 
-def _load(name):
-    path = os.path.join(RESULTS, name)
-    if not os.path.isfile(path):
-        sys.stderr.write(
-            "missing %s -- run `python -m lab.oracle.%s` first\n"
-            % (os.path.relpath(path), name[:-5]))
-        raise SystemExit(2)
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+def indexed(rows, fields, expected):
+    result = {}
+    for row in rows:
+        key = tuple(row[field] for field in fields)
+        if key in result:
+            raise ValueError("duplicate evidence row: %s" % (key,))
+        result[key] = row
+    if set(result) != expected:
+        raise ValueError("incomplete or unexpected evidence rows: %s" %
+                         sorted(set(result) ^ expected))
+    return result
 
 
-def _cells(doc):
-    return {(c["type"], c["layout"], c["reading"]): c for c in doc["cells"]}
-
-
-def _exact(doc):
-    return {(e["type"], e["reading"]): e for e in doc["exactness"]}
+def compare(enum, smt):
+    types = carryable_types()
+    cells = {(t.name, s, r) for t in types for s in LAYOUTS for r in READINGS}
+    exact = {(t.name, r) for t in types for r in READINGS}
+    for doc in (enum, smt):
+        if doc.get("sources") != source_hashes():
+            raise ValueError("stale evidence: source fingerprints do not match")
+        if doc["types"] != len(types):
+            raise ValueError("type count does not match the source table")
+    a = indexed(enum["cells"], ("type", "layout", "reading"), cells)
+    b = indexed(smt["cells"], ("type", "layout", "reading"), cells)
+    problems = []
+    for key in sorted(cells):
+        for field in ("code", "width", "signed", "domain", "misread", "witness"):
+            if a[key][field] != b[key][field]:
+                problems.append("%s: %s disagrees" % (key, field))
+        if b[key]["unsat"] != (b[key]["misread"] == 0):
+            problems.append("%s: inconsistent UNSAT flag" % (key,))
+    ea = indexed(enum["exactness"], ("type", "reading"), exact)
+    eb = indexed(smt["exactness"], ("type", "reading"), exact)
+    for key in sorted(exact):
+        for direction in ("over", "under"):
+            count = ea[key][direction + "_accepted"]
+            enum_found = ea[key][direction + "_witness"] is not None
+            solver_found = eb[key][direction + "_witness"] is not None
+            if (count > 0) != enum_found or enum_found != solver_found:
+                problems.append("%s: %s direction disagrees" % (key, direction))
+        for row in (ea[key], eb[key]):
+            expected = row["over_witness"] is None and row["under_witness"] is None
+            if row["exact"] != expected:
+                problems.append("%s: inconsistent exactness flag" % (key,))
+    return problems
 
 
 def main():
-    enum = _load("matrix.json")
-    smt = _load("smt.json")
-
-    problems = []
-
-    a, b = _cells(enum), _cells(smt)
-    if set(a) != set(b):
-        problems.append("the two runs cover different cells: %s"
-                        % sorted(set(a) ^ set(b)))
-    for key in sorted(set(a) & set(b)):
-        if a[key]["misread"] != b[key]["misread"]:
-            problems.append(
-                "%s layout %s x %s: enumeration says %d misread, z3 says %d"
-                % (key[0], key[1], key[2],
-                   a[key]["misread"], b[key]["misread"]))
-
-    ea, eb = _exact(enum), _exact(smt)
-    for key in sorted(set(ea) & set(eb)):
-        if ea[key]["exact"] != eb[key]["exact"]:
-            problems.append(
-                "%s / %s: enumeration says exact=%s, z3 says exact=%s"
-                % (key[0], key[1], ea[key]["exact"], eb[key]["exact"]))
-
-    print("enumeration: %s, %.2f s" % (enum["method"], enum["elapsed_s"]))
-    print("solver:      %s, %.2f s" % (smt["method"], smt["elapsed_s"]))
-    print("%d cells and %d exactness checks compared"
-          % (len(set(a) & set(b)), len(set(ea) & set(eb))))
-
+    try:
+        with open(os.path.join(RESULTS, "matrix.json"), encoding="utf-8") as f:
+            enum = json.load(f)
+        with open(os.path.join(RESULTS, "smt.json"), encoding="utf-8") as f:
+            smt = json.load(f)
+        problems = compare(enum, smt)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print("INVALID EVIDENCE: %s" % exc, file=sys.stderr)
+        return 2
     if problems:
-        print("\nDISAGREEMENT -- at least one transcription is wrong:")
-        for p in problems:
-            print("  " + p)
+        print("DISAGREEMENT:\n" + "\n".join(problems), file=sys.stderr)
         return 1
-
-    print("every cell agrees")
+    print("%d cells and %d exactness checks agree in both directions" %
+          (len(enum["cells"]), len(enum["exactness"])))
     return 0
 
 

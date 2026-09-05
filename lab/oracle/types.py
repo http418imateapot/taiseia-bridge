@@ -111,12 +111,20 @@ def _table_text(path):
 def all_types(path=DATATYPE_C):
     """Every row of the implementation's type-code table, in file order."""
     out = []
-    for m in _ROW.finditer(_table_text(path)):
+    body = _table_text(path)
+    remainder = _ROW.sub("", body).replace(",", "").strip()
+    if remainder:
+        raise ValueError("unparsed type table content in %s" % path)
+    for m in _ROW.finditer(body):
         out.append(Type(int(m.group(1), 16), m.group(2),
                         _length(m.group(3)), _length(m.group(4)),
                         m.group(5), m.group(6) == "true"))
     if not out:
         raise ValueError("no rows parsed from %s" % path)
+    if len({t.code for t in out}) != len(out):
+        raise ValueError("duplicate type code in %s" % path)
+    if len({t.name for t in out}) != len(out):
+        raise ValueError("duplicate type name in %s" % path)
     return out
 
 

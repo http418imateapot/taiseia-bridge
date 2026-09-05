@@ -1,120 +1,73 @@
-# Step 6 — applying the checked oracle to the C
+# R21 step 5 Applying the checked oracle to C
 
-Steps 1 to 5 ([method.md](method.md)) produce an oracle that has been checked
-two independent ways and shown not to be vacuous. This step is what it was for:
-comparing the implementation against it.
+The proof runner is `python -m lab.proofs.run`. It requires CBMC and a C
+preprocessor and runs in CI. The code under `src/` is the codec subject;
+`lab/subject/metadata.c` is a separate research prototype, not a production port.
 
-> **Nothing in `lab/proofs/` has been run on the machine this was written on.**
-> There is no compiler and no CBMC here. Every number this directory produces
-> comes from CI, and `lab/results/proofs/` is empty until it has run. See
-> [ADR 0010](../../docs/adr/0010-verification-without-hardware.md).
+## Harnesses
 
-## Why not just run the exhaustive test
+| Entry | Arbitrary inputs and property |
+|---|---|
+| h_encode | any type code and int32 value, either modeled layout; acceptance and bytes equal the arithmetic reference |
+| h_decode | any type code and byte pair, any of the four modeled readings; acceptance and value equal the reference |
+| h_roundtrip | carryable type and value in its domain; P1 and P2 |
+| h_parse | arbitrary bytes and held length 0–9; accepted grammar, carryability, result vocabulary and unchanged output on failure |
+| h_bad_line | arbitrary first row; failure poisons startup and later good rows cannot recover it |
+| h_duplicate | duplicate key with differing types; whole configuration refuses startup |
+| h_capacity | every slot usable, next distinct declaration fails and prevents startup |
+| h_config | arbitrary config count, readiness, entries and query; lookup is bounded and returns an existing matching entry |
+| h_registration | arbitrary typed/untyped registration data, count and query; no invented type and port checks carryability |
+| h_port | arbitrary adapter result and output byte, including success without writing output; only carryable types pass |
+| h_no_metadata | every raw byte pair survives unchanged and ENOTFOUND remains visible |
+| h_read | arbitrary type/bytes; complete lab typed read agrees with oracle or returns raw fallback |
+| h_write | arbitrary type/int32 value and either layout; complete lab typed write agrees or preserves output |
+| h_arguments | null pointers and short buffers are refused without modifying outputs |
+| h_naive | expected failures in both naive signed conversions; tool failures cannot satisfy this demonstration |
 
-`tests/test_general.c` already walks all 80 cells and every value of every
-domain. That is complete coverage of the input space, so what is left?
+The eleven metadata entries share one source file and are selected by
+`--function`. Config capacity is four rows; a parse object holds nine bytes.
+These are explicit research bounds, not general proofs of arbitrary file size.
+All registered arrays provide their actual capacity. Callback memory safety is
+assumed; arbitrary callback outputs are not assumed valid.
 
-What is left is that it runs a *compiled binary*. C99 does not require signed
-integers to be two's complement (6.2.6.2), and converting to a signed type a
-value that type cannot represent is implementation-defined (6.3.1.3) — which is
-precisely what sign extension does. gcc and MSVC both do the wanted thing, so
-the test passes on both, and neither run says anything about the source.
+## Checks and evidence
 
-That gap is not closable by testing harder. It needs a tool that reasons about
-the source rather than executing one compilation of it.
-
-`lab/proofs/naive.c` and `make demo` exist to make this concrete rather than
-theoretical: the obvious way to write those two conversions passes every test in
-this repository and CBMC rejects it.
-
-## The three proofs
-
-Each harness leaves its inputs unconstrained and asserts the implementation
-agrees with `reference.c`, which is equations (2)–(4) transcribed a third time.
-
-| Harness | Inputs left arbitrary | What it establishes |
-|---|---|---|
-| `h_encode.c` | type code, layout, value over all of `int32_t` | encode accepts exactly the values the equations accept, and writes the bytes they give |
-| `h_decode.c` | type code, reading, both bytes | decode accepts exactly the pairs the equations accept, and returns the values they give |
-| `h_roundtrip.c` | type code, layout, value in domain | P2 and P1 from [method.md](method.md), for any type rather than for `INT8` |
-
-The type code is deliberately unconstrained across all 256 values, so the 246
-codes the general format cannot carry are covered too — refusal is proved, not
-assumed.
-
-## The flags, and the two that matter
-
-```
+```text
 --bounds-check --pointer-check --pointer-overflow-check
 --conversion-check --signed-overflow-check --unsigned-overflow-check
 --div-by-zero-check --undefined-shift-check
 --unwind 32 --unwinding-assertions
 ```
 
-**`--conversion-check`** is the one that earns this step its place. It is what
-separates "the compiler did what we wanted" from "the source says what we
-meant", and it is what `make demo` demonstrates.
+Bounds must be sufficient for all loops. Unwinding failures remain failures.
+All proofs require exit code 0, a successful CBMC status, a nonempty property
+set and every property successful. The demonstration requires exit code 10 and
+both specific signed-conversion failures, with no unrelated failures.
 
-**`--unwinding-assertions`** is not optional. `ts_datatype()` scans a 25-row
-table, so there is one loop and `--unwind 32` bounds it. Without the assertion
-an insufficient bound silently proves a *smaller program than the one you have*
-— a green result about a truncated loop. That is the same vacuity failure as a
-reading that accepts everything, wearing different clothes, and this directory
-has already been caught by one of those. If the type table ever grows past the
-bound, the proof fails loudly instead.
+The public make targets are preserved:
 
-## Assume versus assert
-
-The rule used throughout: **assume what a conforming sender is entitled to do;
-assert what the code is obliged to do.**
-
-`h_roundtrip.c` asserts that an in-domain value always encodes successfully
-rather than assuming it. Assuming would prune exactly the paths where the
-encoder wrongly refuses a valid value, and the round-trip property below it
-would then hold for no reason. An assumption that quietly deletes the
-counterexample is the single easiest way to get a green proof of nothing.
-
-## Running it
-
-Needs `cbmc` on the path. In CI that is `apt-get install -y cbmc`; the version
-it reports is the version that may be quoted, and no other.
-
-```bash
+```sh
 make -C lab/proofs verify
-```
-
-```bash
 make -C lab/proofs demo
 ```
 
-`verify` must pass. **`demo` must fail** — the Makefile treats a clean
-verification there as the error, because the demonstration is that CBMC rejects
-what the tests accept. Logs land in `lab/results/proofs/`.
+Both targets should return zero when their expectations hold. The underlying
+CBMC run in `demo` must fail for the specified reason. Logs are structured JSON,
+not a grep of an arbitrary failure message. Full-run evidence is archived with
+the source commit; see [reproduce.md](reproduce.md).
 
-For the paper's numbers, the per-harness property counts and solver times are in
-those logs:
+## What a successful result means
 
-```bash
-grep -E "^\*\* [0-9]+ of [0-9]+ failed|Runtime decision procedure" lab/results/proofs/*.log
-```
+The solver reasons about its chosen C target model, shared type table, modeled
+inputs and bounded objects. It does not prove all C99 implementations, arbitrary
+third-party C code, full application behavior, or hardware interoperability.
+The signed conversion demonstration concerns implementation-defined behavior
+and value preservation; it should not be described as two UB findings.
 
-## What this does not establish
+The Python oracle is checked before C. The C reference is another transcription
+of the equations and shares type metadata deliberately. The exhaustive C
+experiment also compares the reference across every carryable domain and byte
+pair; its counts are compared to the independent Python result.
 
-**The type table is a shared premise, not a proved one.** Both the
-implementation and the reference ask `ts_datatype()` for a type's width and
-signedness. Keeping a second copy in the reference would be the drift this lab
-exists to avoid, so the proofs establish that the codec agrees with the
-equations *given the table* and say nothing about whether the table is right.
-That question is [oracle-audit.md](oracle-audit.md) B1 and B2, and it is
-answered — as far as it can be — by `lab/oracle/sensitivity.py`.
-
-**Nothing here is evidence about a real appliance.** A proof is a claim about
-the source and the equations handed to the checker. Which layout any shipping
-firmware actually picked is not knowable from here, and the whole point of the
-matrix is that the wire does not say.
-
-**The write path is not covered.** `appliance.c` widens a command value into a
-multi-byte item by zero-filling, which is the same question one layer up; see
-D1 in [oracle-audit.md](oracle-audit.md). The codec proved here is not yet wired
-to anything — that is [ADR 0014](../../docs/adr/0014-typed-general-data-field.md),
-and it is still proposed.
+A1–A4 and remaining production integration work are documented in
+[paper-r21.md](paper-r21.md). No physical appliance has been used.

@@ -1,5 +1,7 @@
 # taiseia-bridge
 
+[正體中文](README.zh-TW.md)
+
 A TaiSEIA 101 (CNS 16014) appliance link with an MQTT northbound, in portable
 C99.
 
@@ -134,6 +136,7 @@ the file documents the rest inline.
 | [docs/testing.md](docs/testing.md) | what is verified, and what is not |
 | [docs/verification.md](docs/verification.md) | the three strengths of claim, and which are actually established |
 | [lab/](lab) | the expected values, and where they are decisions rather than facts |
+| [R21 paper comparison](lab/docs/paper-r21.md) | reproducible paper experiments and the boundary between the production codec and lab metadata prototype |
 | [docs/adr/](docs/adr) | the decisions, each with the alternatives it rejected |
 | [AGENTS.md](AGENTS.md) | instructions for coding agents |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | style, tests, pull requests |

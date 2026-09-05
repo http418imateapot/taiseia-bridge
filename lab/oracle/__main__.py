@@ -9,7 +9,7 @@ transcriptions disagree anywhere, which is what makes it usable as a gate.
 
 import sys
 
-from lab.oracle import agree, sensitivity, smt, sweep
+from lab.oracle import agree, sensitivity, sweep
 
 
 def _banner(title):
@@ -22,6 +22,7 @@ def main():
 
     _banner("solve")
     try:
+        from lab.oracle import smt
         smt.main()
     except ImportError:
         print("z3 is not installed; skipping the second transcription.")
@@ -31,6 +32,8 @@ def main():
 
     _banner("compare")
     rc = agree.main()
+    if rc:
+        return rc
 
     _banner("premises")
     sensitivity.main()

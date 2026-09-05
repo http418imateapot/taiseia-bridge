@@ -1,117 +1,99 @@
-# Reproducing the runs
+# Reproducing R21
 
-Everything in this directory is Python and runs on a machine with no compiler,
-which is the point: it checks expected values, and expected values are not
-compiled.
+Start at [paper-r21.md](paper-r21.md) for the comparison with the supplied
+manuscript. Its historical measurements are not used as acceptance thresholds.
 
-## What you need
+## Environment
 
-Python 3, and z3 for the second transcription:
+Python 3.9+ with venv, and `lab/requirements.txt`. In the repository root:
 
-```bash
-pip install z3-solver
+```powershell
+.\scripts\install.ps1
 ```
 
-z3 is optional in the sense that `sweep.py` and `sensitivity.py` run without it.
-It is not optional in the sense that matters — without it the enumeration is
-checked against nothing, and `python -m lab.oracle` exits non-zero and says so.
+On POSIX use `sh scripts/install`. Both list discovered local interpreters and
+ask for a number. For an explicit selection or CI:
 
-## Running it
-
-From the repository root:
-
-```bash
-python -m lab.oracle
+```sh
+python scripts/install.py --python /path/to/python3
 ```
 
-That runs all four stages in order and exits non-zero if the two transcriptions
-disagree on any cell. The stages can also be run alone:
+`--list` does not change anything. `--dry-run` prints commands.
+`--reuse` only permits an existing .venv based on the same interpreter.
+The installer does not delete environments or change global Python packages.
+This uses the standard [venv mechanism](https://docs.python.org/3/library/venv.html).
 
-```bash
-python -m lab.oracle.sweep
+## Python-only run on the development machine
+
+```powershell
+.\.venv\Scripts\python.exe -m lab.run --output out/r21
 ```
 
-```bash
-python -m lab.oracle.smt
+It runs Python regression tests, enumeration, SMT, bidirectional comparison,
+width sensitivity and paper assertions. C and CBMC are explicitly skipped.
+An SMT unknown, missing dependency, incomplete grid, stale fingerprint or
+disagreement gives a nonzero exit code. A full run cannot be claimed from this
+partial result.
+
+## Full C and proof run in CI
+
+The `verify` job in `.github/workflows/ci.yml` builds on Ubuntu 24.04 with
+GCC, AddressSanitizer, UBSan and warnings as errors, and installs CBMC 6.11.0
+from its official release. It runs:
+
+```sh
+mkdir -p out
+gcc -std=c99 -Wall -Wextra -Werror -Wconversion -Wshadow -pedantic \
+  -fsanitize=address,undefined -fno-sanitize-recover=all -g \
+  -Isrc -Ilab/subject -Ilab/proofs lab/subject/experiment.c \
+  lab/subject/metadata.c lab/proofs/reference.c \
+  src/core/taiseia/general.c src/core/taiseia/datatype.c \
+  src/core/taiseia/frame.c -o out/lab-experiment
+.venv/bin/python -m lab.run --output out/r21 \
+  --c-experiment out/lab-experiment --cbmc cbmc --require-full
 ```
 
-```bash
-python -m lab.oracle.agree
-```
+The compiled experiment evaluates every value in all 80 cells and every byte
+pair in all 40 exactness rows. It independently compares C output to the C
+reference, then Python compares measured counts against its own enumeration.
+The three adapters process all three raw response patterns. A corrupted XOR
+checksum is checked separately from invalid padding.
 
-```bash
-python -m lab.oracle.sensitivity
-```
+The runner executes the three production-codec harnesses and eleven metadata
+entry points, then validates both deliberate signed-conversion counterexamples.
+Every proof retains unwinding assertions and conversion/memory/overflow checks.
+No compiler or CBMC is installed or run on the primary development machine.
 
-`types.py` has a `__main__` too, which prints the carryable set it derived from
-`src/core/taiseia/datatype.c` — useful when a row in that table changes and the
-matrix moves.
+The existing product build, unit, serial/socket, simulator and broker CI jobs
+remain enabled. Separate Python tests cover Windows/Linux and Python 3.9/3.14.
 
-## Step 6 needs more than Python
+## Output and provenance
 
-The proofs need `cbmc` and a C compiler. Neither is on the machine this was
-written on, so **step 6 has never been run here** and cannot be. It runs in the
-`verify` CI job:
-
-```bash
-make -C lab/proofs verify
-```
-
-```bash
-make -C lab/proofs demo
-```
-
-`verify` must pass; `demo` must **fail**, because it demonstrates CBMC rejecting
-the obvious way of writing sign extension. Logs go to `lab/results/proofs/`,
-which is empty until CI has produced them. The CBMC version that may be quoted
-is the one in `lab/results/proofs/versions.txt` — CI installs whatever the
-distribution ships, and that is deliberately not pinned to a number written down
-in advance.
-
-See [proofs.md](proofs.md).
-
-## Output
-
-Written to `lab/results/`, and committed, because a result nobody can point at is
-not evidence:
-
-| File | What it holds |
+| File | Meaning |
 |---|---|
-| `matrix.json` | the 80 cells by enumeration, plus exactness in both directions |
-| `smt.json` | the same 80 cells by z3, with `unsat` recorded per cell |
-| `sensitivity.json` | how the matrix moves if a type width had been judged the other way |
-| `run.log` | console output of the last full run |
+| `manifest.json` | input commit, dirty state, LF-normalized source SHA-256, platform, commands, exit codes, timestamps and stage statuses |
+| `matrix.json`, `smt.json` | independently generated matrix and exactness evidence |
+| `sensitivity.json` | consequences of alternative width premises |
+| `c-experiment.json` | measured C matrix, exactness, response cases and check totals |
+| `paper.json` | R21 claim comparison and explicit limitations |
+| `proofs/all.json` | CBMC version, commands, elapsed times, properties and failures |
+| `proofs/h_*.json` | full CBMC JSON output, including both demonstration traces |
+| `*.log` | captured stdout/stderr for reproduction and diagnosis |
 
-## The run these documents quote
+CI uploads `r21-evidence`, even on failure. Evidence intended for citation is
+copied into `lab/results/r21/` after review, preserving the original commit and
+CI run URL. A separate evidence commit does not change what source was tested.
+Never describe a partial/failed manifest as a full successful run.
 
-| | |
-|---|---|
-| Date | 2026-08-30 |
-| Machine | Windows 10, single run, not a benchmark |
-| Python | 3.9.13 |
-| z3 | 5.1.0 |
-| enumeration | 13.20 s |
-| solver | 1.48 s |
-| sensitivity | 18.40 s |
-| agreement | 80 cells and 40 exactness checks, no disagreement |
+Use a new output directory for each experiment. `--force` explicitly allows
+replacement of known output files; the runner never deletes a directory tree.
+Individual historical oracle commands are still available, but old files
+without current source fingerprints cannot pass the new agreement gate.
 
-These are the figures in `lab/results/*.json` as committed; re-running moves them
-by a second or so. They are wall clock on one desktop and are here so a reader
-knows the order of magnitude — seconds, not hours — not as a measurement of
-anything. The solver is
-faster than the enumeration here because the enumeration walks 256 × 256 byte
-pairs per type per reading for the exactness check, and the solver asks for one
-witness.
+## Measurements
 
-## What these numbers are not
-
-They are not the numbers in any earlier write-up of this work, and they should
-not be reconciled with one. They are what this code produced on this machine on
-this date. If an external document quotes different figures, the document is the
-thing to correct.
-
-Nor do they say anything about a real appliance. Every result here is about the
-equations in `lab/oracle/` and the type table in `src/core/taiseia/datatype.c`.
-No appliance has ever been connected to this project; see
-[docs/testing.md](../../docs/testing.md) and
-[ADR 0010](../../docs/adr/0010-verification-without-hardware.md).
+Use the committed run records for current property counts, check totals and
+times. The original R21 counts (including its 5.95.1 CBMC run), line counts and
+timings were produced elsewhere and are not established by the starting
+checkout. Changing tool versions, bounds or assertions changes these values.
+Elapsed times describe one run, not a performance benchmark.

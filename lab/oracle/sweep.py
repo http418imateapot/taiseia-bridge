@@ -26,9 +26,8 @@ import time
 from lab.oracle.layouts import LAYOUTS, encode
 from lab.oracle.readings import READINGS, decode
 from lab.oracle.types import carryable_types
+from lab.evidence import RESULTS, source_hashes
 
-RESULTS = os.path.join(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))), "results")
 
 
 def misread(t, layout, reading):
@@ -103,6 +102,7 @@ def run():
 
     return {
         "generated_by": "lab/oracle/sweep.py",
+        "sources": source_hashes(),
         "method": "exhaustive enumeration",
         "python": sys.version.split()[0],
         "types": len(types),

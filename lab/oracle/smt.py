@@ -39,9 +39,14 @@ except ImportError:  # pragma: no cover -- reported by the caller
 from lab.oracle.layouts import LAYOUTS
 from lab.oracle.readings import READINGS
 from lab.oracle.types import carryable_types
+from lab.evidence import RESULTS, source_hashes
 
-RESULTS = os.path.join(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))), "results")
+def checked_status(solver):
+    """Unknown/timeout is neither UNSAT nor evidence of completeness."""
+    status = solver.check()
+    if status not in (z3.sat, z3.unsat):
+        raise RuntimeError("SMT returned unknown: " + solver.reason_unknown())
+    return status
 
 
 def _encode(t, layout, v):
@@ -103,7 +108,7 @@ def misread(t, layout, reading, limit=None):
     s.add(z3.Not(z3.And(accepted, got == v)))
 
     found = []
-    while s.check() == z3.sat:
+    while checked_status(s) == z3.sat:
         x = s.model()[v].as_long()
         found.append(x)
         s.add(v != x)
@@ -145,7 +150,7 @@ def not_exact(t, reading):
     under.add(emitted(), z3.Not(accepted))
 
     def witness(s):
-        if s.check() != z3.sat:
+        if checked_status(s) == z3.unsat:
             return None
         m = s.model()
         return "%02X %02X" % (m[hi].as_long(), m[lo].as_long())
@@ -189,6 +194,7 @@ def run():
 
     return {
         "generated_by": "lab/oracle/smt.py",
+        "sources": source_hashes(),
         "method": "SMT (z3)",
         "z3": z3.get_version_string(),
         "python": sys.version.split()[0],
