@@ -1,0 +1,1261 @@
+{
+  "cells": [
+    {
+      "code": 1,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "ENUM16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 1,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "ENUM16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 1,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "ENUM16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 1,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "ENUM16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 1,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "ENUM16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 1,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "ENUM16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 1,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "ENUM16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 1,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "ENUM16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 16,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "ENUM16_Bit",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 16,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "ENUM16_Bit",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 16,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "ENUM16_Bit",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 16,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "ENUM16_Bit",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 16,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "ENUM16_Bit",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 16,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "ENUM16_Bit",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 16,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "ENUM16_Bit",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 16,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "ENUM16_Bit",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 32,
+      "domain": 256,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "UINT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 32,
+      "domain": 256,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "UINT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 32,
+      "domain": 256,
+      "layout": "A",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "UINT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 32,
+      "domain": 256,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "UINT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 32,
+      "domain": 256,
+      "layout": "B",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "UINT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 32,
+      "domain": 256,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "UINT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 32,
+      "domain": 256,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "UINT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 32,
+      "domain": 256,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "UINT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 33,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "UINT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 33,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "UINT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 33,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "UINT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 33,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "UINT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 33,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "UINT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 33,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "UINT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 33,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "UINT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 33,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "UINT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 48,
+      "domain": 256,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": true,
+      "type": "INT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 48,
+      "domain": 256,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": true,
+      "type": "INT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 48,
+      "domain": 256,
+      "layout": "A",
+      "misread": 128,
+      "reading": "strict",
+      "signed": true,
+      "type": "INT8",
+      "width": 1,
+      "witness": -128
+    },
+    {
+      "code": 48,
+      "domain": 256,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": true,
+      "type": "INT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 48,
+      "domain": 256,
+      "layout": "B",
+      "misread": 128,
+      "reading": "wide",
+      "signed": true,
+      "type": "INT8",
+      "width": 1,
+      "witness": -128
+    },
+    {
+      "code": 48,
+      "domain": 256,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": true,
+      "type": "INT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 48,
+      "domain": 256,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": true,
+      "type": "INT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 48,
+      "domain": 256,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": true,
+      "type": "INT8",
+      "width": 1,
+      "witness": null
+    },
+    {
+      "code": 49,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": true,
+      "type": "INT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 49,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": true,
+      "type": "INT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 49,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "strict",
+      "signed": true,
+      "type": "INT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 49,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": true,
+      "type": "INT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 49,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "wide",
+      "signed": true,
+      "type": "INT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 49,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": true,
+      "type": "INT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 49,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": true,
+      "type": "INT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 49,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": true,
+      "type": "INT16",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 64,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "Y-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 64,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "Y-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 64,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "Y-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 64,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "Y-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 64,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "Y-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 64,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "Y-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 64,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "Y-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 64,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "Y-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 65,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "M-D",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 65,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "M-D",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 65,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "M-D",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 65,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "M-D",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 65,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "M-D",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 65,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "M-D",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 65,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "M-D",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 65,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "M-D",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 66,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "H-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 66,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "H-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 66,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "H-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 66,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "H-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 66,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "H-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 66,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "H-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 66,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "H-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 66,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "H-M",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 67,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "M-S",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 67,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "M-S",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 67,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "M-S",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 67,
+      "domain": 65536,
+      "layout": "A",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "M-S",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 67,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "wide",
+      "signed": false,
+      "type": "M-S",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 67,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "low",
+      "signed": false,
+      "type": "M-S",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 67,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "strict",
+      "signed": false,
+      "type": "M-S",
+      "width": 2,
+      "witness": null
+    },
+    {
+      "code": 67,
+      "domain": 65536,
+      "layout": "B",
+      "misread": 0,
+      "reading": "lenient",
+      "signed": false,
+      "type": "M-S",
+      "width": 2,
+      "witness": null
+    }
+  ],
+  "elapsed_s": 13.2,
+  "exactness": [
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "ENUM16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "low",
+      "type": "ENUM16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "ENUM16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "ENUM16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "ENUM16_Bit",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "low",
+      "type": "ENUM16_Bit",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "ENUM16_Bit",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "ENUM16_Bit",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "UINT8",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": false,
+      "over_accepted": 65280,
+      "over_witness": "01 00",
+      "reading": "low",
+      "type": "UINT8",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "UINT8",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "UINT8",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "UINT16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "low",
+      "type": "UINT16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "UINT16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "UINT16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": false,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "INT8",
+      "under_accepted": 128,
+      "under_witness": "00 80"
+    },
+    {
+      "exact": false,
+      "over_accepted": 65152,
+      "over_witness": "01 00",
+      "reading": "low",
+      "type": "INT8",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": false,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "INT8",
+      "under_accepted": 128,
+      "under_witness": "FF 80"
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "INT8",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "INT16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "low",
+      "type": "INT16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "INT16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "INT16",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "Y-M",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "low",
+      "type": "Y-M",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "Y-M",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "Y-M",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "M-D",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "low",
+      "type": "M-D",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "M-D",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "M-D",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "H-M",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "low",
+      "type": "H-M",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "H-M",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "H-M",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "wide",
+      "type": "M-S",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "low",
+      "type": "M-S",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "strict",
+      "type": "M-S",
+      "under_accepted": 0,
+      "under_witness": null
+    },
+    {
+      "exact": true,
+      "over_accepted": 0,
+      "over_witness": null,
+      "reading": "lenient",
+      "type": "M-S",
+      "under_accepted": 0,
+      "under_witness": null
+    }
+  ],
+  "generated_by": "lab/oracle/sweep.py",
+  "layouts": [
+    "A",
+    "B"
+  ],
+  "method": "exhaustive enumeration",
+  "python": "3.9.13",
+  "readings": [
+    "wide",
+    "low",
+    "strict",
+    "lenient"
+  ],
+  "types": 10
+}

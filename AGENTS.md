@@ -91,6 +91,39 @@ packets rather than short-circuiting them. Keep it that way: it is the only
 thing standing in for hardware, and a simulator that agrees with the core by
 construction proves nothing.
 
+## The lab
+
+`lab/` checks the *expected values*, which the tests cannot: an assertion
+compares an output against a number a person transcribed from prose, and where
+the prose permits more than one reading, the assertion encodes one of them and
+passes forever. Start at [lab/docs/oracle-audit.md](lab/docs/oracle-audit.md).
+
+Rules for working there, which differ from the rest of the repository:
+
+- **It is Python and it ships nothing.** No CMake target, no artefact, nothing
+  under `src/` depending on it. The freestanding rule governs `src/core` and
+  `src/ports`; it does not reach `lab/`. "No external libraries" in this project
+  is a constraint on run time, and `lab/` has no run time — it may use z3.
+- **Do not transcribe anything twice.** `lab/oracle/types.py` reads the type
+  table out of `src/core/taiseia/datatype.c` rather than keeping a copy. A second
+  transcription can drift, and a drifted oracle fails in the direction of
+  agreeing with itself.
+- **Check an oracle before judging anything with it**, two independent ways, and
+  check vacuity in *both* directions — accepting what no sender emits, and
+  rejecting what one does. Checking one direction reported three of four readings
+  here as exact when one is.
+- **Extend the verification-honesty rule to proofs.** Never cite a property
+  count, a solver verdict or a timing without a committed run in `lab/results/`
+  behind it. An `unsat` is a claim about the equations handed to the solver and
+  nothing more; it is never a claim about a real appliance.
+- **Assume what a conforming peer may do; assert what the code must do.** An
+  assumption that prunes the failing path turns a proof into a green statement
+  about nothing. `lab/proofs/h_roundtrip.c` says which is which and why.
+- **`lab/proofs` needs cbmc and a compiler, so it only runs in CI.** Its logs
+  are the only place a property count or a solver time may be quoted from.
+- **When you find a new place the standard permits two readings, add it to the
+  audit** rather than deciding and moving on. That file is the deliverable.
+
 ## Commits and pull requests
 
 - Conventional commits: `feat(core):`, `fix(sim):`, `docs:`, `test:`, `chore:`.

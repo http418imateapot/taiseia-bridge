@@ -1,0 +1,158 @@
+{
+  "elapsed_s": 6.0,
+  "findings": [
+    {
+      "cells_that_move": [],
+      "code": 1,
+      "exactness_that_moves": [
+        "low"
+      ],
+      "misread_cells_if_flipped": 0,
+      "misread_cells_now": 0,
+      "sensitive": true,
+      "signed": false,
+      "type": "ENUM16",
+      "width_alternative": 1,
+      "width_implemented": 2
+    },
+    {
+      "cells_that_move": [],
+      "code": 16,
+      "exactness_that_moves": [
+        "low"
+      ],
+      "misread_cells_if_flipped": 0,
+      "misread_cells_now": 0,
+      "sensitive": true,
+      "signed": false,
+      "type": "ENUM16_Bit",
+      "width_alternative": 1,
+      "width_implemented": 2
+    },
+    {
+      "cells_that_move": [],
+      "code": 32,
+      "exactness_that_moves": [
+        "low"
+      ],
+      "misread_cells_if_flipped": 0,
+      "misread_cells_now": 0,
+      "sensitive": true,
+      "signed": false,
+      "type": "UINT8",
+      "width_alternative": 2,
+      "width_implemented": 1
+    },
+    {
+      "cells_that_move": [],
+      "code": 33,
+      "exactness_that_moves": [
+        "low"
+      ],
+      "misread_cells_if_flipped": 0,
+      "misread_cells_now": 0,
+      "sensitive": true,
+      "signed": false,
+      "type": "UINT16",
+      "width_alternative": 1,
+      "width_implemented": 2
+    },
+    {
+      "cells_that_move": [
+        "A x strict",
+        "B x wide"
+      ],
+      "code": 48,
+      "exactness_that_moves": [
+        "low",
+        "strict",
+        "wide"
+      ],
+      "misread_cells_if_flipped": 0,
+      "misread_cells_now": 2,
+      "sensitive": true,
+      "signed": true,
+      "type": "INT8",
+      "width_alternative": 2,
+      "width_implemented": 1
+    },
+    {
+      "cells_that_move": [
+        "A x strict",
+        "B x wide"
+      ],
+      "code": 49,
+      "exactness_that_moves": [
+        "low",
+        "strict",
+        "wide"
+      ],
+      "misread_cells_if_flipped": 2,
+      "misread_cells_now": 0,
+      "sensitive": true,
+      "signed": true,
+      "type": "INT16",
+      "width_alternative": 1,
+      "width_implemented": 2
+    },
+    {
+      "cells_that_move": [],
+      "code": 64,
+      "exactness_that_moves": [
+        "low"
+      ],
+      "misread_cells_if_flipped": 0,
+      "misread_cells_now": 0,
+      "sensitive": true,
+      "signed": false,
+      "type": "Y-M",
+      "width_alternative": 1,
+      "width_implemented": 2
+    },
+    {
+      "cells_that_move": [],
+      "code": 65,
+      "exactness_that_moves": [
+        "low"
+      ],
+      "misread_cells_if_flipped": 0,
+      "misread_cells_now": 0,
+      "sensitive": true,
+      "signed": false,
+      "type": "M-D",
+      "width_alternative": 1,
+      "width_implemented": 2
+    },
+    {
+      "cells_that_move": [],
+      "code": 66,
+      "exactness_that_moves": [
+        "low"
+      ],
+      "misread_cells_if_flipped": 0,
+      "misread_cells_now": 0,
+      "sensitive": true,
+      "signed": false,
+      "type": "H-M",
+      "width_alternative": 1,
+      "width_implemented": 2
+    },
+    {
+      "cells_that_move": [],
+      "code": 67,
+      "exactness_that_moves": [
+        "low"
+      ],
+      "misread_cells_if_flipped": 0,
+      "misread_cells_now": 0,
+      "sensitive": true,
+      "signed": false,
+      "type": "M-S",
+      "width_alternative": 1,
+      "width_implemented": 2
+    }
+  ],
+  "generated_by": "lab/oracle/sensitivity.py",
+  "python": "3.14.7",
+  "question": "does the misreading matrix depend on a width judgement?"
+}

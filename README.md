@@ -1,5 +1,7 @@
 # taiseia-bridge
 
+[正體中文](README.zh-TW.md)
+
 A TaiSEIA 101 (CNS 16014) appliance link with an MQTT northbound, in portable
 C99.
 
@@ -41,6 +43,8 @@ plus what the platform already provides.
 | Serial adapter (POSIX) | built, tested through a real device |
 | Serial adapter (Windows) | built; byte path unverified — see below |
 | The two applications | built, smoke-tested |
+| Expected values, and the decisions behind them | audited — see [lab/](lab) |
+| General-format codec, typed, all four readings | built, exhaustively tested; proofs run in CI, called by nothing |
 
 **No physical appliance has ever been connected to this code.** Verification is
 by CI — Linux with AddressSanitizer and UBSan, Linux release, and MSVC — by a
@@ -130,6 +134,9 @@ the file documents the rest inline.
 | [docs/mqtt-api.md](docs/mqtt-api.md) | topic templates and payload schema |
 | [docs/porting.md](docs/porting.md) | adding a platform, a protocol, or a concurrency model |
 | [docs/testing.md](docs/testing.md) | what is verified, and what is not |
+| [docs/verification.md](docs/verification.md) | the three strengths of claim, and which are actually established |
+| [lab/](lab) | the expected values, and where they are decisions rather than facts |
+| [R21 paper comparison](lab/docs/paper-r21.md) | reproducible paper experiments and the boundary between the production codec and lab metadata prototype |
 | [docs/adr/](docs/adr) | the decisions, each with the alternatives it rejected |
 | [AGENTS.md](AGENTS.md) | instructions for coding agents |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | style, tests, pull requests |

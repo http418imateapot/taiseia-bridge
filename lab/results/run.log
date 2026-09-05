@@ -1,0 +1,52 @@
+
+=== enumerate ===========================================================
+80 cells  (10 types x 2 layouts x 4 readings)
+2 cells misread; 78 safe
+  INT8   layout A x strict    128 of 256 values, witness -128
+  INT8   layout B x wide      128 of 256 values, witness -128
+
+INT8 misread counts        wide      low   strict  lenient
+  layout A                    0        0      128        0
+  layout B                  128        0        0        0
+
+readings that are not exact (accept what no sender emits, or reject what one does):
+  UINT8  low       over 65280 (01 00)  under    0 (-)
+  INT8   wide      over     0 (-)  under  128 (00 80)
+  INT8   low       over 65152 (01 00)  under    0 (-)
+  INT8   strict    over     0 (-)  under  128 (FF 80)
+exact for all 10 types: lenient
+
+13.20 s -> lab\results\matrix.json
+
+=== solve ===============================================================
+z3 5.1.0, 80 cells
+78 cells proved safe (unsat); 2 with counterexamples
+  INT8   layout A x strict    128 values, least -128
+  INT8   layout B x wide      128 values, least -128
+exact for all 10 types: lenient
+1.48 s -> lab\results\smt.json
+
+=== compare =============================================================
+enumeration: exhaustive enumeration, 13.20 s
+solver:      SMT (z3), 1.48 s
+80 cells and 40 exactness checks compared
+every cell agrees
+
+=== premises ============================================================
+width judgements whose alternative MOVES a misreading cell:
+  0x30 INT8        1 -> 2 bytes: 2 misreading cells -> 0   (A x strict, B x wide)
+  0x31 INT16       2 -> 1 bytes: 0 misreading cells -> 2   (A x strict, B x wide)
+
+width judgements that move only an exactness verdict:
+  0x01 ENUM16      2 -> 1 bytes: low
+  0x10 ENUM16_Bit  2 -> 1 bytes: low
+  0x20 UINT8       1 -> 2 bytes: low
+  0x21 UINT16      2 -> 1 bytes: low
+  0x40 Y-M         2 -> 1 bytes: low
+  0x41 M-D         2 -> 1 bytes: low
+  0x42 H-M         2 -> 1 bytes: low
+  0x43 M-S         2 -> 1 bytes: low
+
+insensitive to the judgement: none
+
+18.40 s -> lab\results\sensitivity.json

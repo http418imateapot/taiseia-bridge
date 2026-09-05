@@ -1,0 +1,23 @@
+test_both_empty_matrices_are_not_vacuous_success (test_evidence.EvidenceTests.test_both_empty_matrices_are_not_vacuous_success) ... ok
+test_complete_consistent_evidence_is_accepted (test_evidence.EvidenceTests.test_complete_consistent_evidence_is_accepted) ... ok
+test_duplicate_rows_are_not_silently_collapsed (test_evidence.EvidenceTests.test_duplicate_rows_are_not_silently_collapsed) ... ok
+test_duplicate_type_codes_are_rejected (test_evidence.EvidenceTests.test_duplicate_type_codes_are_rejected) ... ok
+test_each_exactness_direction_is_compared_even_if_both_are_inexact (test_evidence.EvidenceTests.test_each_exactness_direction_is_compared_even_if_both_are_inexact) ... ok
+test_missing_exactness_row_is_rejected (test_evidence.EvidenceTests.test_missing_exactness_row_is_rejected) ... ok
+test_missing_solver_returns_nonzero_with_actionable_message (test_evidence.EvidenceTests.test_missing_solver_returns_nonzero_with_actionable_message) ... ok
+test_partial_type_transcription_is_rejected (test_evidence.EvidenceTests.test_partial_type_transcription_is_rejected) ... ok
+test_stale_evidence_is_rejected_even_when_both_runs_agree (test_evidence.EvidenceTests.test_stale_evidence_is_rejected_even_when_both_runs_agree) ... ok
+test_unknown_is_never_interpreted_as_unsat (test_evidence.EvidenceTests.test_unknown_is_never_interpreted_as_unsat) ... ok
+test_unsafe_cell_cannot_be_labelled_unsat (test_evidence.EvidenceTests.test_unsafe_cell_cannot_be_labelled_unsat) ... ok
+test_wrong_value_count_is_rejected (test_evidence.EvidenceTests.test_wrong_value_count_is_rejected) ... ok
+test_probe_handles_missing_interpreter_without_success (test_evidence.InstallerTests.test_probe_handles_missing_interpreter_without_success) ... ok
+test_probe_refuses_virtual_environment_and_old_python (test_evidence.InstallerTests.test_probe_refuses_virtual_environment_and_old_python) ... ok
+test_selection_is_explicit_and_bounded (test_evidence.InstallerTests.test_selection_is_explicit_and_bounded) ... ok
+test_demo_requires_both_specific_conversion_counterexamples (test_evidence.ProofGateTests.test_demo_requires_both_specific_conversion_counterexamples) ... ok
+test_proof_requires_success_properties_and_success_status (test_evidence.ProofGateTests.test_proof_requires_success_properties_and_success_status) ... ok
+test_unrelated_counterexample_does_not_validate_demo (test_evidence.ProofGateTests.test_unrelated_counterexample_does_not_validate_demo) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.087s
+
+OK

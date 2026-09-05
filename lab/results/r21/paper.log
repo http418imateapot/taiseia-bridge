@@ -1,0 +1,32 @@
+{
+  "paper": "POWER2026 R21 (2026-08-30)",
+  "groups": {
+    "width_two": [
+      "ENUM16",
+      "ENUM16_Bit",
+      "UINT16",
+      "INT16",
+      "Y-M",
+      "M-D",
+      "H-M",
+      "M-S"
+    ],
+    "width_one_unsigned": [
+      "UINT8"
+    ],
+    "width_one_signed": [
+      "INT8"
+    ]
+  },
+  "cells": 80,
+  "exactness_checks": 40,
+  "c_experiment": "checked",
+  "problems": [],
+  "passed": true,
+  "limitations": [
+    "No physical appliance",
+    "Metadata is a lab prototype",
+    "Paper historical timings/counts are not acceptance targets",
+    "Model assumptions A1-A4 remain unproved"
+  ]
+}

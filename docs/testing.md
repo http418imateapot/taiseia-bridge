@@ -200,6 +200,25 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+## Beyond testing: are the expected values right?
+
+Everything above establishes that this program does what the tests expect. It
+cannot establish that what the tests expect is right — an assertion compares an
+output against a value a person transcribed from a document, and where the
+document permits more than one reading, the assertion encodes whichever one that
+person picked and passes forever.
+
+That question has its own directory. [lab/](../lab/README.md) checks expected
+values: it inventories the places where this project's are decisions rather than
+facts, writes the contested ones as arithmetic, and checks each oracle two
+independent ways before anything is judged by it. It is Python, it builds
+nothing, and it runs on a machine with no compiler.
+
+`c20ba30`, `d87aef4` and `b5b54b1` in this repository's history are all this
+failure mode: assertions that passed, or would have passed, without establishing
+the property. Two were caught by MSVC disagreeing with gcc rather than by the
+assertions. See [verification.md](verification.md).
+
 ## When hardware arrives
 
 The simulator becomes the fast test rather than the only one. Captured

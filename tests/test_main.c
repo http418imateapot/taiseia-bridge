@@ -14,6 +14,7 @@ int main(void)
     test_frame_mb();
     test_reassembly();
     test_datatype();
+    test_general();
     test_registration();
     test_sim_link();
     test_appliance();

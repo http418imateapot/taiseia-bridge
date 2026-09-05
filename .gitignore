@@ -26,6 +26,11 @@ cmake-build-*/
 *.ilk
 *.su
 
+# Python bytecode, from lab/. The lab's results are committed; its caches are not.
+__pycache__/
+*.pyc
+.venv/
+
 # Editors / tooling
 .vscode/
 .idea/
