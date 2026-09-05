@@ -51,6 +51,8 @@ int ref_encode(uint8_t dtype, int layout, int32_t v, uint8_t *out)
     int32_t  lo;
     int32_t  hi;
     uint32_t n;
+    int32_t  modulus;
+    int32_t  residue;
 
     if (!ref_carryable(dtype, &width, &is_signed))
         return 0;
@@ -60,10 +62,11 @@ int ref_encode(uint8_t dtype, int layout, int32_t v, uint8_t *out)
         return 0;
 
     /* enc_A(v) = v mod 2^16;  enc_B(v) = v mod 2^8, and mod 2^16 at width 2. */
-    if (layout == REF_LAYOUT_B && width == 1u)
-        n = (uint32_t)v % 256u;
-    else
-        n = (uint32_t)v % 65536u;
+    modulus = (layout == REF_LAYOUT_B && width == 1u) ? 256 : 65536;
+    residue = v % modulus;
+    if (residue < 0)
+        residue += modulus;
+    n = (uint32_t)residue;
 
     out[0] = (uint8_t)(n / 256u);
     out[1] = (uint8_t)(n % 256u);

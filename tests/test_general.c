@@ -373,6 +373,33 @@ static void bad_arguments_are_refused_not_guessed(void)
                                b, sizeof b), RES_EINVAL);
 }
 
+/* Domain refusal must happen before any residue arithmetic, even for the
+ * extreme int32_t inputs, and must not replace the caller's bytes. */
+static void out_of_domain_extremes_leave_encoded_bytes_untouched(void)
+{
+    const int32_t extremes[] = { INT32_MIN, INT32_MAX };
+    size_t i;
+
+    for (i = 0; i < ts_datatype_count(); ++i) {
+        const ts_datatype_t *t = ts_datatype_at(i);
+        int32_t lo = 0;
+        int32_t hi = 0;
+        size_t e;
+        if (ts_general_domain(t->code, &lo, &hi) != RES_OK)
+            continue;
+        for (e = 0; e < sizeof extremes / sizeof extremes[0]; ++e) {
+            int layout;
+            for (layout = 0; layout <= (int)TS_LAYOUT_ZERO_FILL; ++layout) {
+                uint8_t b[TS_GENERAL_DATA_BYTES] = { 0x5A, 0xA5 };
+                CHECK_EQ(ts_general_encode(t->code, (ts_layout_t)layout,
+                                           extremes[e], b, sizeof b), RES_EINVAL);
+                CHECK_EQ(b[0], 0x5A);
+                CHECK_EQ(b[1], 0xA5);
+            }
+        }
+    }
+}
+
 void test_general(void)
 {
     ten_types_fit_the_two_byte_field();
@@ -383,4 +410,5 @@ void test_general(void)
     a_lenient_receiver_recovers_every_value();
     a_lenient_receiver_accepts_exactly_what_a_sender_sends();
     bad_arguments_are_refused_not_guessed();
+    out_of_domain_extremes_leave_encoded_bytes_untouched();
 }

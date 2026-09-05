@@ -63,7 +63,6 @@ def main(argv=None):
         harnesses += ["h_naive"]
     summary = {"cbmc": version, "checks": CHECKS, "harnesses": [],
                "scope": "CBMC target model, bounded objects, shared datatype premise"}
-    proof_dir = ROOT / "lab/proofs"
     for name in harnesses:
         sources = ["lab/proofs/" + name + ".c", "lab/proofs/reference.c",
                    "src/core/taiseia/general.c", "src/core/taiseia/datatype.c"]
@@ -90,7 +89,9 @@ def main(argv=None):
             record["passed"] = verdict(p.returncode, document, name == "h_naive")
             properties = [v for item in document for v in item.get("result", [])]
             record["properties"] = len(properties)
-            record["failed_properties"] = [v for v in properties if v.get("status") != "SUCCESS"]
+            record["failed_properties"] = [
+                {key: value for key, value in v.items() if key != "trace"}
+                for v in properties if v.get("status") != "SUCCESS"]
         except (OSError, ValueError, subprocess.SubprocessError) as exc:
             record.update(passed=False, error=str(exc))
         record["elapsed_s"] = round(time.perf_counter() - started, 3)

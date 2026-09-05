@@ -83,12 +83,13 @@ result_t ts_general_encode(uint8_t dtype, ts_layout_t layout, int32_t value,
         return RES_EINVAL;
 
     /*
-     * Equation (2). Conversion to unsigned is modular and defined for every
-     * value including the negative ones, which is why this is a conversion and
-     * not a mask applied to a signed value -- a bitwise operation on a negative
-     * signed integer reads its representation, and C99 does not fix that.
+     * Equation (2). The domain check bounds value to [-32768, 65535].
+     * Form a nonnegative residue before converting, so the conversion preserves
+     * its value as well as being C99-defined. A direct negative-to-unsigned cast
+     * is defined modular arithmetic, but fails CBMC's stronger conversion check.
+     * Mask only unsigned values; no signed representation is assumed.
      */
-    n = (uint32_t)value;
+    n = (uint32_t)(value < 0 ? value + 65536 : value);
 
     if (layout == TS_LAYOUT_ZERO_FILL && t->value_len == 1u)
         n &= 0xFFu;
