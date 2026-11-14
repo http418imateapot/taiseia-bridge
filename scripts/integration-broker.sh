@@ -93,12 +93,15 @@ command -v mosquitto_sub >/dev/null || { echo "mosquitto-clients not installed" 
 
 # ------------------------------------------------------------------- broker --
 
-cat > "$DIR/mosquitto.conf" <<EOF
-listener $PORT 127.0.0.1
-allow_anonymous true
-EOF
-
-mosquitto -c "$DIR/mosquitto.conf" > "$DIR/mosquitto.log" 2>&1 &
+# No configuration file. From mosquitto 2.0, a listener given with -p binds to
+# loopback only, and with no listener in a configuration file anonymous clients
+# are allowed -- which is exactly the broker this test needs.
+#
+# A file is not just unnecessary but unreadable on some hosts: Ubuntu 26.04's
+# apparmor package confines /usr/sbin/mosquitto to configuration under
+# /etc/mosquitto, so `-c` pointing into a temporary directory is refused with
+# "Unable to open config file".
+mosquitto -p "$PORT" > "$DIR/mosquitto.log" 2>&1 &
 MOSQ_PID=$!
 
 # Ask the broker rather than read its log: the wording of the startup message
