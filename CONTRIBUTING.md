@@ -13,8 +13,16 @@ ctest --test-dir build --output-on-failure
 Sanitizers are on by default off Windows and do not recover. Do not turn them
 off to get a green run.
 
+On Windows the generator is multi-configuration: build with `--config Debug`
+and test with `ctest --test-dir build -C Debug`.
+
 CI additionally builds with warnings as errors, in release without sanitizers,
-and on MSVC. All three must pass.
+and on MSVC; runs the broker integration test; runs the lab's oracle, compiled
+experiment and proofs (`verify`); and runs the lab's Python tests on Linux and
+Windows. Every job must pass. [docs/testing.md](docs/testing.md) lists what
+each one adds.
+
+Changes under `lab/` have their own setup — see [lab/README.md](lab/README.md).
 
 ## The three rules that are not negotiable
 

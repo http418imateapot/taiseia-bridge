@@ -25,9 +25,25 @@ Sanitizers are on by default on non-Windows builds and do not recover: an
 undefined-behaviour report fails the build. Do not disable them to get a green
 run.
 
+On Windows the generator is multi-configuration: `cmake --build build --config Debug`
+and `ctest --test-dir build -C Debug --output-on-failure`.
+
 There is no compiler on the primary development machine. CI is the build and
 test environment — push and read the run. Never claim code compiles or passes
 without a CI run to point at.
+
+The lab (see below) has its own environment, a project-local `.venv`, which the
+installer creates without touching global packages:
+
+```bash
+python scripts/install.py --python "$(command -v python3)"
+.venv/bin/python -m unittest discover -s lab/tests -v
+.venv/bin/python -m lab.run --output out/r21
+```
+
+On Windows use `.\scripts\install.ps1` and `.venv\Scripts\python.exe`. Locally
+`lab.run` reports C and proofs as **skipped** and the run as **partial**; only
+the `verify` CI job, with `--require-full`, produces a full run.
 
 ## Layering — the rule that matters most
 
@@ -100,8 +116,12 @@ passes forever. Start at [lab/docs/oracle-audit.md](lab/docs/oracle-audit.md).
 
 Rules for working there, which differ from the rest of the repository:
 
-- **It is Python and it ships nothing.** No CMake target, no artefact, nothing
-  under `src/` depending on it. The freestanding rule governs `src/core` and
+- **It ships nothing.** It is Python, plus C experiments and proof harnesses
+  (`lab/subject/`, `lab/proofs/`) that compile only in CI. No CMake target, no
+  artefact, nothing under `src/` depending on it. `lab/subject/metadata.c` is a
+  research prototype, not connected to `src/apps`, MQTT or the CLI; production
+  integration is [ADR 0014](docs/adr/0014-typed-general-data-field.md), still
+  proposed. The freestanding rule governs `src/core` and
   `src/ports`; it does not reach `lab/`. "No external libraries" in this project
   is a constraint on run time, and `lab/` has no run time — it may use z3.
 - **Do not transcribe anything twice.** `lab/oracle/types.py` reads the type

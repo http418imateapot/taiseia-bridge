@@ -154,7 +154,8 @@ src/apps/cli/               one exchange at a time, by hand
 tests/              host tests; no platform, no hardware
 cmake/              the freestanding check
 lab/                the expected values, and the decisions behind them --
-                    Python, builds nothing, nothing in src/ depends on it
+                    Python plus C experiments and proofs compiled only in
+                    CI; ships nothing, nothing in src/ depends on it
 ```
 
 `lab/` is outside the layering above and outside the freestanding rule, because

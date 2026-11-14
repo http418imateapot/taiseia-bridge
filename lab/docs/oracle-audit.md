@@ -114,7 +114,7 @@ both follow the text and disagree on the wire.
 - Implemented as 2. There is a published inconsistency here of the same kind as
   B1 — the printed data length disagrees with the type's own name and with the
   worked layout elsewhere in the annex.
-- **Documented**: no. `src/core/taiseia/datatype.c:31` is a plain row.
+- **Documented**: no. `src/core/taiseia/datatype.c:28` is a plain row.
 - **And it is the judgement that moves the answer.** `lab/oracle/sensitivity.py`
   flips each carryable type's width to the other plausible value and re-runs the
   matrix. Two types are sensitive, and only one of them is disputed:
