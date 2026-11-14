@@ -10,10 +10,18 @@ Everything in `src/core` and `src/adapters/sim`, on every push, by CI:
 | linux / gcc / release | optimised build, no sanitizers — different code, different bugs |
 | windows / msvc | a second compiler and a second standard library; the Windows serial adapter's argument checks and failure paths, on a real Windows machine |
 
+Two further jobs check the expected values rather than the program; they are
+described under "Beyond testing" below:
+
+| Job | What it adds |
+|---|---|
+| linux / oracle and proofs (`verify`) | the Python oracle and z3; the lab C experiment compiled with gcc, sanitizers and `-Werror`; the CBMC proofs; uploads `r21-evidence` |
+| lab / {ubuntu, windows} / Python {3.9, 3.14} | the lab's Python regression tests, through the same installer a contributor uses |
+
 `-fno-sanitize-recover=all` matters: without it UBSan prints a line into a log
 nobody reads and the build stays green.
 
-Two CTest cases run in each:
+Two CTest cases run in each of the three program jobs:
 
 - `unit` — the assertions in `tests/`
 - `core_is_freestanding` — [cmake/check_freestanding.cmake](../cmake/check_freestanding.cmake),
@@ -200,6 +208,8 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+On Windows, build with `--config Debug` and pass `-C Debug` to `ctest`.
+
 ## Beyond testing: are the expected values right?
 
 Everything above establishes that this program does what the tests expect. It
@@ -211,8 +221,10 @@ person picked and passes forever.
 That question has its own directory. [lab/](../lab/README.md) checks expected
 values: it inventories the places where this project's are decisions rather than
 facts, writes the contested ones as arithmetic, and checks each oracle two
-independent ways before anything is judged by it. It is Python, it builds
-nothing, and it runs on a machine with no compiler.
+independent ways before anything is judged by it. It ships nothing and nothing
+in `src/` depends on it. Its Python half runs on a machine with no compiler; its
+C experiment and proofs compile only in the `verify` CI job, and a local run
+reports them as skipped rather than passed.
 
 `c20ba30`, `d87aef4` and `b5b54b1` in this repository's history are all this
 failure mode: assertions that passed, or would have passed, without establishing

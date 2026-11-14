@@ -1,31 +1,27 @@
 # Proof logs
 
-The reviewed R21 run is now stored in [../r21/](../r21/README.md), including
-losslessly compressed raw CBMC output. This directory remains the output of
-standalone `make verify` / `make demo` commands; the older description below
-records the original, pre-R21 setup.
+This is the default output directory of the proof runner
+(`python -m lab.proofs.run`, and the `make -C lab/proofs verify` / `demo`
+targets that wrap it). It is empty in the repository: the machine this project
+is written on has no compiler and no CBMC, so nothing here can be produced
+locally — see [ADR 0010](../../../docs/adr/0010-verification-without-hardware.md).
 
-Empty until CI has run. The machine this project is written on has no compiler
-and no CBMC, so nothing here can be produced locally — see
-[ADR 0010](../../../docs/adr/0010-verification-without-hardware.md).
+**The reviewed evidence is not here.** It is in [../r21/](../r21/README.md),
+copied from a named CI run, with the raw CBMC output stored losslessly
+compressed. Cite from there.
 
-The `verify` job in [.github/workflows/ci.yml](../../../.github/workflows/ci.yml)
-runs `make -C lab/proofs verify` and `make -C lab/proofs demo`, and uploads this
-directory as a build artifact. After a run it holds:
+## What a run writes
 
 | File | What it holds |
 |---|---|
-| `versions.txt` | the CBMC version that produced the rest |
-| `h_encode.log` | full CBMC output, including the property count and the solver time |
-| `h_decode.log` | as above |
-| `h_roundtrip.log` | as above |
-| `h_naive.log` | the demonstration, which is expected to REPORT FAILURES |
+| `h_<harness>.json` | CBMC's full JSON output for one harness, including its properties and their status |
+| `h_<harness>.stderr.log` | CBMC's stderr for that harness |
+| `verify.json`, `demo.json` or `all.json` | the suite summary: CBMC version, each command, exit codes, property counts, failures, elapsed times |
 
-Property counts and timings for citation come from those logs and nowhere else:
+The `verify` suite requires every property to pass; the `demo` suite requires
+`h_naive` to fail with exactly the two expected signed-conversion
+counterexamples. See [lab/docs/proofs.md](../../docs/proofs.md).
 
-```bash
-grep -E "^\*\* [0-9]+ of [0-9]+ failed|Runtime decision procedure" lab/results/proofs/*.log
-```
-
-A count quoted from memory, from an earlier write-up, or from another machine is
-not evidence about this code. See [AGENTS.md](../../../AGENTS.md).
+Property counts and timings come from the structured JSON, not from grepping a
+text log. A count quoted from memory, from an earlier write-up, or from another
+machine is not evidence about this code. See [AGENTS.md](../../../AGENTS.md).

@@ -86,6 +86,25 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+On Windows the generator is multi-configuration: build with
+`cmake --build build --config Debug`, test with `ctest --test-dir build -C Debug`,
+and the programs are under `build\Debug\`.
+
+## Running the lab
+
+[lab/](lab) is Python plus C experiments and proofs, and ships nothing. The
+installer finds a local Python 3.9+ and creates a project-local `.venv`:
+
+```bash
+sh scripts/install
+.venv/bin/python -m lab.run --output out/r21
+```
+
+On Windows run `.\scripts\install.ps1` and use `.\.venv\Scripts\python.exe`.
+Without a C compiler and CBMC the run reports C and proofs as **skipped** and
+itself as **partial**; only the `verify` CI job produces a full run. See
+[lab/docs/reproduce.md](lab/docs/reproduce.md).
+
 ## Running it, with no hardware and no broker
 
 ```bash
@@ -136,7 +155,7 @@ the file documents the rest inline.
 | [docs/testing.md](docs/testing.md) | what is verified, and what is not |
 | [docs/verification.md](docs/verification.md) | the three strengths of claim, and which are actually established |
 | [lab/](lab) | the expected values, and where they are decisions rather than facts |
-| [R21 paper comparison](lab/docs/paper-r21.md) | reproducible paper experiments and the boundary between the production codec and lab metadata prototype |
+| [R21 paper comparison](lab/docs/paper-r21.md) | reproducible paper experiments and the boundary between the production codec and lab metadata prototype (in Traditional Chinese; [reproduce.md](lab/docs/reproduce.md) covers the commands in English) |
 | [docs/adr/](docs/adr) | the decisions, each with the alternatives it rejected |
 | [AGENTS.md](AGENTS.md) | instructions for coding agents |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | style, tests, pull requests |
