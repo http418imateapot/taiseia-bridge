@@ -43,7 +43,7 @@ static result_t build_general(uint8_t *out, size_t cap, size_t *out_len,
 }
 
 result_t ts_build_read(uint8_t *out, size_t cap, size_t *out_len,
-                       uint8_t sa_id, uint8_t service_id)
+                       uint8_t sa_id, uint16_t service_id)
 {
     if (service_id > TS_SVC_ID_MAX)
         return RES_EINVAL;
@@ -54,7 +54,7 @@ result_t ts_build_read(uint8_t *out, size_t cap, size_t *out_len,
 }
 
 result_t ts_build_write(uint8_t *out, size_t cap, size_t *out_len,
-                        uint8_t sa_id, uint8_t service_id, uint16_t value)
+                        uint8_t sa_id, uint16_t service_id, uint16_t value)
 {
     if (service_id > TS_SVC_ID_MAX)
         return RES_EINVAL;

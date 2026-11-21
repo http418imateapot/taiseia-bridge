@@ -25,7 +25,8 @@
  * TWO RECORD FORMATS, and the difference matters more than it looks.
  *
  *   General (3 bytes)     [service | write bit] [support high] [support low]
- *   Multi-byte (2+N)      [service | write bit] [type code] [support ...]
+ *   Multi-byte (4+N)      [type: write bit] [service id, 2 bytes] [type code]
+ *                         [support ...]
  *
  * Only the multi-byte format carries a data type code. For a general-format
  * appliance the two support bytes could be a range, a maximum, or a bit mask,
@@ -81,7 +82,7 @@ typedef enum {
 #define TS_CLASS_SENSOR      3u
 
 typedef struct {
-    uint8_t  service_id;
+    uint16_t service_id;                     /* 7 bits general, 16 multi-byte */
     bool     writable;
     bool     dtype_known;                    /* multi-byte format only     */
     uint8_t  dtype;                          /* valid when dtype_known     */
@@ -114,9 +115,7 @@ typedef struct {
  *                     stream that does not divide evenly, or more services
  *                     than TS_MAX_CAPABILITIES
  *   RES_EUNSUPPORTED  well formed but not decodable here: a fragmented reply,
- *                     a record whose type code has no fixed support width, or
- *                     a multi-byte service id above TS_SVC_ID_MAX, which
- *                     nothing above this layer can hold.
+ *                     or a record whose type code has no fixed support width.
  *                     The header fields are filled in before returning, so a
  *                     caller can log which case it hit.
  */
@@ -126,8 +125,14 @@ result_t ts_registration_parse(const uint8_t *data, size_t len,
 /** Link speed in bits per second, or 0 when the code is not one we know. */
 uint32_t ts_baud_from_code(uint8_t code);
 
-/** Find a capability by service id; NULL when the appliance did not offer it. */
+/**
+ * Find a capability by service id; NULL when the appliance did not offer it.
+ *
+ * The id is compared whole. 0x0120 and 0x20 are different services, and a
+ * general-format appliance, whose ids are seven bits, offers neither 0x0120
+ * nor anything else above 0x7F.
+ */
 const ts_capability_t *ts_registration_find(const ts_registration_t *reg,
-                                            uint8_t service_id);
+                                            uint16_t service_id);
 
 #endif /* TSB_CORE_TAISEIA_REGISTRATION_H */

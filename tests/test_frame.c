@@ -55,6 +55,14 @@ static void builders_reject_bad_arguments(void)
     CHECK_EQ(ts_build_read(out, sizeof(out), &len, 0x04, 0x80), RES_EINVAL);
     CHECK_EQ(ts_build_write(out, sizeof(out), &len, 0x04, 0xFF, 0), RES_EINVAL);
 
+    /* Nor can a wide one be narrowed into the seven bits: 0x0120 would go
+     * out as 0x20, a different service. */
+    len = 0;
+    CHECK_EQ(ts_build_read(out, sizeof(out), &len, 0x04, 0x0120), RES_EINVAL);
+    CHECK_EQ(ts_build_write(out, sizeof(out), &len, 0x04, 0x0120, 1),
+             RES_EINVAL);
+    CHECK_EQ(len, 0);
+
     CHECK_EQ(ts_build_read(out, 5, &len, 0x04, 0x07), RES_ETOOBIG);
     CHECK_EQ(ts_build_read(NULL, sizeof(out), &len, 0x04, 0x07), RES_EINVAL);
     CHECK_EQ(ts_build_read(out, sizeof(out), NULL, 0x04, 0x07), RES_EINVAL);

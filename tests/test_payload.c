@@ -226,6 +226,49 @@ static void multibyte_capabilities_resolve_their_shape(void)
 }
 
 /*
+ * A two-byte service id is published whole, in decimal, in telemetry and in
+ * the capability set: 0x0120 is "288", and stays apart from 0x0020, "32".
+ */
+static void a_two_byte_service_id_is_published_whole(void)
+{
+    sim_link_t    s;
+    link_t        l;
+    appliance_t   a;
+    appl_policy_t p;
+    char          buf[2048];
+    strbuf_t      sb;
+    const uint8_t u16[] = { 0x00, 0x00, 0x27, 0x10 };
+    int           i;
+
+    sim_link_init(&s, 0xE0);
+    CHECK_EQ(sim_link_set_identity(&s, TS_FORMAT_MULTIBYTE, TS_CLASS_SENSOR,
+                                   0x00E0, "ACME", "PM-1"), RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x0120, 0x21, false, 1111, u16, 4),
+             RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x0020, 0x21, false, 2222, u16, 4),
+             RES_OK);
+    sim_link_bind(&s, &l);
+
+    appl_policy_defaults(&p);
+    appl_init(&a, &p);
+    for (i = 0; i < 20; i++)
+        CHECK_EQ(appl_tick(&a, &l, 0), RES_OK);
+    CHECK_EQ(appl_state(&a), APPL_READY);
+
+    sb_init(&sb, buf, sizeof(buf));
+    CHECK_EQ(payload_telemetry(&sb, "TS-1", "T", &a), RES_OK);
+    CHECK_STREQ(sb_str(&sb),
+                "{\"device_id\":\"TS-1\",\"device_time\":\"T\","
+                "\"sa_id\":224,\"online\":true,"
+                "\"attributes\":{\"288\":1111,\"32\":2222}}");
+
+    sb_init(&sb, buf, sizeof(buf));
+    CHECK_EQ(payload_capabilities(&sb, "TS-1", "T", &a), RES_OK);
+    CHECK(strstr(sb_str(&sb), "{\"id\":288,\"access\":\"r\"") != NULL);
+    CHECK(strstr(sb_str(&sb), "{\"id\":32,\"access\":\"r\"") != NULL);
+}
+
+/*
  * Multi-byte readings, in the three shapes they come in: a number, a batch,
  * and something whose width nothing here can decode.
  *
@@ -389,6 +432,7 @@ void test_payload(void)
     an_offline_report_is_still_a_report();
     general_format_capabilities_are_raw();
     multibyte_capabilities_resolve_their_shape();
+    a_two_byte_service_id_is_published_whole();
     multibyte_telemetry_renders_each_shape();
     status_and_the_will_differ_only_in_the_timestamp();
     an_acknowledgement_echoes_the_tag_and_names_each_outcome();

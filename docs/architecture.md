@@ -173,11 +173,6 @@ refused rather than half-handled, or a verification gap:
   [adr/0008](adr/0008-no-tls.md).
 - **`expand_bitfields`.** The setting is parsed and validated; nothing reads
   it.
-- **Multi-byte service ids above 0x7F.** The multi-byte format gives the
-  service id two bytes; the capability set, the appliance model, the link port
-  and MQTT hold seven bits. The frame layer reads all sixteen, and a
-  registration or reply naming a wider id is refused with `RES_EUNSUPPORTED`
-  rather than masked into some other service.
 - **No physical appliance** has ever been connected to any of this, and the
   **Windows serial adapter** has never carried a byte in CI — there is no
   virtual COM pair a hosted runner can create. See [testing.md](testing.md).

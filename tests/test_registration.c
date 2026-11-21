@@ -320,31 +320,72 @@ static void a_multibyte_record_is_read_at_the_tables_offsets(void)
 }
 
 /*
- * The record has two bytes of service id; nothing above the parser holds more
- * than seven bits. 0x0120 masked to seven bits is 0x20 -- another real service
- * -- so the reply is refused rather than misattributed.
+ * The record has two bytes of service id, and all sixteen bits are kept.
+ * 0x0120 masked to seven bits is 0x20 -- another real service -- so an
+ * appliance declaring both must come out with two capabilities, each found
+ * under its own id and never under the other's.
  */
-static void a_multibyte_service_id_too_wide_to_hold_is_refused(void)
+static void a_two_byte_service_id_is_kept_apart_from_its_low_byte(void)
 {
-    ts_registration_t reg;
-    uint8_t           p[64];
-    size_t            len = make_payload(p, 0x80, 0x03);
+    ts_registration_t      reg;
+    uint8_t                p[64];
+    size_t                 len = make_payload(p, 0x80, 0x03);
+    const ts_capability_t *wide;
+    const ts_capability_t *narrow;
 
-    p[len++] = 0x00;
-    p[len++] = 0x01; p[len++] = 0x20;   /* service 0x0120 */
+    p[len++] = 0x80;                    /* writable                     */
+    p[len++] = 0x01; p[len++] = 0x20;   /* service 0x0120               */
     p[len++] = 0x21;
     p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x01;
 
-    CHECK_EQ(ts_registration_parse(p, len, &reg), RES_EUNSUPPORTED);
-    /* The header is still filled in, so a caller can say what it refused. */
-    CHECK_EQ(reg.format, TS_FORMAT_MULTIBYTE);
+    p[len++] = 0x00;                    /* read only                    */
+    p[len++] = 0x00; p[len++] = 0x20;   /* service 0x0020               */
+    p[len++] = 0x21;
+    p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x02;
 
+    CHECK_EQ(ts_registration_parse(p, len, &reg), RES_OK);
+    CHECK_EQ(reg.n_caps, 2);
+    CHECK_EQ(reg.caps[0].service_id, 0x0120);
+    CHECK_EQ(reg.caps[1].service_id, 0x0020);
+
+    wide   = ts_registration_find(&reg, 0x0120);
+    narrow = ts_registration_find(&reg, 0x0020);
+    CHECK(wide != NULL);
+    CHECK(narrow != NULL);
+    CHECK(wide != narrow);
+    if (wide && narrow) {
+        CHECK_EQ(wide->service_id, 0x0120);
+        CHECK_EQ(wide->writable, 1);
+        CHECK_EQ(wide->support[3], 0x01);
+        CHECK_EQ(narrow->service_id, 0x0020);
+        CHECK_EQ(narrow->writable, 0);
+        CHECK_EQ(narrow->support[3], 0x02);
+    }
+
+    /* Another id with the same low byte was not declared and is not found. */
+    CHECK(ts_registration_find(&reg, 0x0220) == NULL);
+    CHECK(ts_registration_find(&reg, 0x00A0) == NULL);
+
+    /* The widest id the field can hold. */
     len = make_payload(p, 0x80, 0x03);
     p[len++] = 0x00;
-    p[len++] = 0x00; p[len++] = 0x80;   /* service 0x0080 */
+    p[len++] = 0xFF; p[len++] = 0xFF;
     p[len++] = 0x21;
     p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x01;
-    CHECK_EQ(ts_registration_parse(p, len, &reg), RES_EUNSUPPORTED);
+    CHECK_EQ(ts_registration_parse(p, len, &reg), RES_OK);
+    CHECK_EQ(reg.n_caps, 1);
+    CHECK_EQ(reg.caps[0].service_id, 0xFFFF);
+    CHECK(ts_registration_find(&reg, 0xFFFF) != NULL);
+    CHECK(ts_registration_find(&reg, 0x7F) == NULL);
+
+    /* A general-format appliance's ids are seven bits, and asking it for a
+     * wide one does not find the service its low byte happens to name. */
+    len = make_payload(p, 0x00, 0x03);
+    p[len++] = 0x20; p[len++] = 0x00; p[len++] = 0x01;
+    CHECK_EQ(ts_registration_parse(p, len, &reg), RES_OK);
+    CHECK(ts_registration_find(&reg, 0x0020) != NULL);
+    CHECK(ts_registration_find(&reg, 0x0120) == NULL);
+    CHECK(ts_registration_find(&reg, 0x00A0) == NULL);
 }
 
 /*
@@ -399,7 +440,7 @@ void test_registration(void)
     a_malformed_payload_is_refused();
     an_unknown_type_code_stops_the_stream();
     a_multibyte_record_is_read_at_the_tables_offsets();
-    a_multibyte_service_id_too_wide_to_hold_is_refused();
+    a_two_byte_service_id_is_kept_apart_from_its_low_byte();
     too_many_services_is_refused();
     the_support_buffer_fits_every_known_type();
 }
