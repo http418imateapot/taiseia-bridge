@@ -177,11 +177,12 @@ static void interleaved_replies_are_refused(void)
 }
 
 /*
- * The format gives the service id two bytes; the link port holds seven bits.
- * 0x0120 masked to seven bits is 0x20, a real service, so masking would hand
- * one service's readings over as another's. It is refused instead.
+ * The format gives the service id two bytes, and all sixteen bits are kept.
+ * 0x0120 masked to seven bits is 0x20, a real service, so it matters that the
+ * two are never confused: not on the way in, and not when a fragment for one
+ * turns up in the middle of a reply for the other.
  */
-static void a_service_id_wider_than_the_port_is_refused(void)
+static void a_two_byte_service_id_is_carried_whole(void)
 {
     ts_reasm_t r;
     uint8_t    pkt[64];
@@ -189,18 +190,45 @@ static void a_service_id_wider_than_the_port_is_refused(void)
 
     ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
     n = mb_fragment(pkt, 0, 0x0120, 0x20, 2, 0x11);
-    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EUNSUPPORTED);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_OK);
+    CHECK(ts_reasm_complete(&r));
+    CHECK_EQ(r.service_id, 0x0120);
+    CHECK_EQ(r.len, 2);
+
+    /* The first id past the general format's seven bits, and the widest. */
+    ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
+    n = mb_fragment(pkt, 0, 0x0080, 0x20, 2, 0x11);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_OK);
+    CHECK_EQ(r.service_id, 0x0080);
+
+    ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
+    n = mb_fragment(pkt, 0, 0xFFFF, 0x20, 2, 0x11);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_OK);
+    CHECK_EQ(r.service_id, 0xFFFF);
+
+    /* Fragments of 0x0120 join up with each other... */
+    ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
+    n = mb_fragment(pkt, 1, 0x0120, 0x20, 2, 0x11);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EAGAIN);
+    n = mb_fragment(pkt, 0, 0x0120, 0x20, 2, 0x22);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_OK);
+    CHECK_EQ(r.service_id, 0x0120);
+    CHECK_EQ(r.count, 4);
+
+    /* ...but never with 0x20, in either order. */
+    ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
+    n = mb_fragment(pkt, 1, 0x0120, 0x20, 2, 0x11);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EAGAIN);
+    n = mb_fragment(pkt, 0, 0x0020, 0x20, 2, 0x22);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EFORMAT);
     CHECK(!ts_reasm_complete(&r));
 
     ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
-    n = mb_fragment(pkt, 0, 0x0080, 0x20, 2, 0x11);
-    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EUNSUPPORTED);
-
-    /* The widest id the port can carry still passes. */
-    ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
-    n = mb_fragment(pkt, 0, 0x007F, 0x20, 2, 0x11);
-    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_OK);
-    CHECK_EQ(r.service_id, 0x7F);
+    n = mb_fragment(pkt, 1, 0x0020, 0x20, 2, 0x11);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EAGAIN);
+    n = mb_fragment(pkt, 0, 0x0120, 0x20, 2, 0x22);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EFORMAT);
+    CHECK(!ts_reasm_complete(&r));
 }
 
 /* Past the buffer, the answer is a refusal. A truncated batch of readings
@@ -427,7 +455,7 @@ void test_reassembly(void)
     a_skipped_fragment_is_refused();
     a_repeated_fragment_is_refused();
     interleaved_replies_are_refused();
-    a_service_id_wider_than_the_port_is_refused();
+    a_two_byte_service_id_is_carried_whole();
     an_oversize_reply_is_refused_not_truncated();
     a_damaged_fragment_is_refused();
     registration_fragments_drop_the_repeated_header();

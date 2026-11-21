@@ -65,7 +65,7 @@ typedef enum {
 } appl_write_result_t;
 
 typedef struct {
-    uint8_t             service_id;
+    uint16_t            service_id;
     uint16_t            value;
     appl_write_result_t result;
     bool                done;
@@ -79,7 +79,7 @@ typedef struct {
 } appl_write_batch_t;
 
 typedef struct {
-    uint8_t  service_id;
+    uint16_t service_id;
     bool     valid;
     int64_t  updated_ms;
     unsigned misses;        /* consecutive failed reads of this service */
@@ -139,7 +139,7 @@ typedef struct {
     appl_op_t         op;
     uint32_t          req_id;
     uint32_t          next_req_id;
-    uint8_t           op_service;
+    uint16_t          op_service;
     uint16_t          op_value;
     unsigned          attempt;
     int64_t           stuck_deadline_ms;
@@ -180,8 +180,13 @@ const ts_registration_t *appl_identity(const appliance_t *a);
  */
 unsigned appl_sweeps(const appliance_t *a);
 
-/** Latest value of one service. RES_ENOTFOUND when absent or stale. */
-result_t appl_value(const appliance_t *a, uint8_t service_id, uint16_t *out);
+/**
+ * Latest value of one service. RES_ENOTFOUND when absent or stale.
+ *
+ * Service ids are compared whole, here and in every lookup below: 0x0120 is
+ * not 0x20, and asking for one never answers with the other.
+ */
+result_t appl_value(const appliance_t *a, uint16_t service_id, uint16_t *out);
 
 /**
  * The whole cached reading, however wide it is.
@@ -190,7 +195,7 @@ result_t appl_value(const appliance_t *a, uint8_t service_id, uint16_t *out);
  * want a number use appl_value; callers that have to render whatever the
  * appliance sent -- a batch of sensor readings, a string -- need this.
  */
-const appl_value_t *appl_reading(const appliance_t *a, uint8_t service_id);
+const appl_value_t *appl_reading(const appliance_t *a, uint16_t service_id);
 
 /**
  * Start a batch of writes, as one control command asks for.

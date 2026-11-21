@@ -9,7 +9,7 @@
 
 #include <string.h>
 
-static sim_service_t *find_service(sim_link_t *s, uint8_t id)
+static sim_service_t *find_service(sim_link_t *s, uint16_t id)
 {
     size_t i;
 
@@ -67,7 +67,7 @@ result_t sim_link_set_identity(sim_link_t *s, ts_format_t format,
     return RES_OK;
 }
 
-result_t sim_link_add_service(sim_link_t *s, uint8_t service_id, uint8_t dtype,
+result_t sim_link_add_service(sim_link_t *s, uint16_t service_id, uint8_t dtype,
                               bool writable, uint16_t value,
                               const uint8_t *support, size_t support_len)
 {
@@ -75,7 +75,9 @@ result_t sim_link_add_service(sim_link_t *s, uint8_t service_id, uint8_t dtype,
 
     if (!s || !support)
         return RES_EINVAL;
-    if (service_id > TS_SVC_ID_MAX)
+    /* A general-format record has seven bits for the id; the multi-byte one
+     * has sixteen, all of which uint16_t holds. */
+    if (s->format == TS_FORMAT_GENERAL && service_id > TS_SVC_ID_MAX)
         return RES_EINVAL;
     if (support_len == 0u || support_len > TS_SUPPORT_MAX_BYTES)
         return RES_EINVAL;
@@ -136,14 +138,14 @@ void sim_link_corrupt_next(sim_link_t *s)
         s->corrupt_next = true;
 }
 
-result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to)
+result_t sim_link_set_clamp(sim_link_t *s, uint16_t service_id, uint16_t to)
 {
     sim_service_t *svc;
 
     if (!s)
         return RES_EINVAL;
 
-    svc = find_service(s, (uint8_t)(service_id & TS_SVC_ID_MASK));
+    svc = find_service(s, service_id);
     if (!svc)
         return RES_ENOTFOUND;
 
@@ -153,14 +155,14 @@ result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to)
     return RES_OK;
 }
 
-result_t sim_link_set_items(sim_link_t *s, uint8_t service_id, uint16_t n)
+result_t sim_link_set_items(sim_link_t *s, uint16_t service_id, uint16_t n)
 {
     sim_service_t *svc;
 
     if (!s || n == 0u)
         return RES_EINVAL;
 
-    svc = find_service(s, (uint8_t)(service_id & TS_SVC_ID_MASK));
+    svc = find_service(s, service_id);
     if (!svc)
         return RES_ENOTFOUND;
 
@@ -223,13 +225,17 @@ static result_t build_registration(const sim_link_t *s, uint8_t *out,
         const sim_service_t *svc = &s->services[i];
 
         if (s->format == TS_FORMAT_MULTIBYTE) {
-            /* Service type, then the id in two bytes of its own, then the
-             * type code. */
+            /* Service type, then the id in two bytes of its own, big
+             * endian, then the type code. */
             out[pos++] = (uint8_t)(svc->writable ? TS_SVC_WRITE_BIT : 0u);
-            out[pos++] = 0u;
-            out[pos++] = (uint8_t)(svc->service_id & TS_SVC_ID_MASK);
+            out[pos++] = (uint8_t)((svc->service_id >> 8) & 0xFFu);
+            out[pos++] = (uint8_t)(svc->service_id & 0xFFu);
             out[pos++] = svc->dtype;
         } else {
+            /* Added under the multi-byte format and then switched: refuse
+             * rather than mask a wide id into a general record. */
+            if (svc->service_id > TS_SVC_ID_MAX)
+                return RES_EINVAL;
             out[pos++] = (uint8_t)((svc->service_id & TS_SVC_ID_MASK) |
                                    (svc->writable ? TS_SVC_WRITE_BIT : 0u));
         }
@@ -279,13 +285,9 @@ static result_t deliver(sim_link_t *s, uint32_t req_id, uint8_t *pkt,
             s->pending.status = RES_ETOOBIG;
             return RES_OK;
         }
-        if (m.service_id > TS_SVC_ID_MAX) {
-            s->pending.status = RES_EUNSUPPORTED;
-            return RES_OK;
-        }
         s->pending.status     = RES_OK;
         s->pending.sa_id      = m.sa_id;
-        s->pending.service_id = (uint8_t)m.service_id;
+        s->pending.service_id = m.service_id;
         s->pending.write      = m.write;
         s->pending.multibyte  = true;
         s->pending.dtype      = m.dtype;
@@ -509,9 +511,7 @@ static result_t sim_submit(void *self, const link_req_t *req)
         if (r != RES_OK)
             return r;
 
-        svc = (mb.service_id > TS_SVC_ID_MAX)
-                  ? NULL
-                  : find_service(s, (uint8_t)mb.service_id);
+        svc = find_service(s, mb.service_id);
         if (!svc) {
             fail(s, req->id, RES_ENOTFOUND);
             return RES_OK;

@@ -43,7 +43,7 @@ typedef struct {
     uint32_t count;        /* items, summed across fragments   */
     uint8_t  dtype;
     uint8_t  sa_id;
-    uint8_t  service_id;
+    uint16_t service_id;   /* the whole two-byte field, for a multi-byte reply */
     bool     write;
 
     unsigned fragments;
@@ -63,9 +63,8 @@ void ts_reasm_begin(ts_reasm_t *r, ts_reply_kind_t kind);
  *
  * Refuses rather than assembles something plausible: a fragment number that
  * does not count down, more bytes than the buffer holds, a packet that does
- * not decode, or a continuation that is missing the header it must repeat.
- * A multi-byte reply whose service id is wider than the link port's seven
- * bits is RES_EUNSUPPORTED.
+ * not decode, a continuation that is missing the header it must repeat, or a
+ * multi-byte fragment naming a different service id or type than the first.
  */
 result_t ts_reasm_add(ts_reasm_t *r, const uint8_t *pkt, size_t len);
 

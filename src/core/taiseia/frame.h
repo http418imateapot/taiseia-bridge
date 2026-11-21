@@ -51,9 +51,14 @@ uint8_t ts_checksum(const uint8_t *buf, size_t n);
  *
  * Both data bytes are filled with 0xFF, which is how the protocol marks a
  * request that carries no value.
+ *
+ * The general format has seven bits for the service id. `service_id` is as
+ * wide as the id everything above the frame layer holds, so that a wide one
+ * reaches this check instead of being narrowed on the way in: anything above
+ * TS_SVC_ID_MAX is RES_EINVAL, never masked into another service.
  */
 result_t ts_build_read(uint8_t *out, size_t cap, size_t *out_len,
-                       uint8_t sa_id, uint8_t service_id);
+                       uint8_t sa_id, uint16_t service_id);
 
 /**
  * Build a write request for one service.
@@ -61,9 +66,10 @@ result_t ts_build_read(uint8_t *out, size_t cap, size_t *out_len,
  * `value` is written big-endian across the two data bytes. A value that is
  * semantically one byte wide belongs in the low half with a zero high half;
  * this function does not know the service's data type and does not guess.
+ * A `service_id` above TS_SVC_ID_MAX is RES_EINVAL, as for a read.
  */
 result_t ts_build_write(uint8_t *out, size_t cap, size_t *out_len,
-                        uint8_t sa_id, uint8_t service_id, uint16_t value);
+                        uint8_t sa_id, uint16_t service_id, uint16_t value);
 
 /**
  * Read the declared total length from the first byte of a packet.

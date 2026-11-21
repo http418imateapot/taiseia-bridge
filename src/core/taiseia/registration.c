@@ -170,14 +170,9 @@ result_t ts_registration_parse(const uint8_t *data, size_t len,
             uint16_t id = (uint16_t)(((uint16_t)data[pos + TS_REG_MB_OFF_ID] << 8) |
                                      data[pos + TS_REG_MB_OFF_ID + 1u]);
 
-            /* The record has room for sixteen bits of service id; everything
-             * above this layer holds seven. Masking would quietly turn one
-             * service into another, so refuse instead. Bits 6..0 of the
-             * service type byte are reserved and are not read. */
-            if (id > TS_SVC_ID_MAX)
-                return RES_EUNSUPPORTED;
-
-            cap->service_id  = (uint8_t)id;
+            /* All sixteen bits are the id, and all sixteen are kept. Bits
+             * 6..0 of the service type byte are reserved and are not read. */
+            cap->service_id  = id;
             cap->dtype_known = true;
             cap->dtype       = data[pos + TS_REG_MB_OFF_DTYPE];
             cap->support_len = n - TS_REG_MB_RECORD_HEADER;
@@ -193,15 +188,15 @@ result_t ts_registration_parse(const uint8_t *data, size_t len,
 }
 
 const ts_capability_t *ts_registration_find(const ts_registration_t *reg,
-                                            uint8_t service_id)
+                                            uint16_t service_id)
 {
     size_t i;
 
     if (!reg)
         return NULL;
 
-    service_id = (uint8_t)(service_id & TS_SVC_ID_MASK);
-
+    /* No masking: narrowing the id here is exactly how 0x0120 would come to
+     * answer for 0x20. */
     for (i = 0; i < reg->n_caps; i++) {
         if (reg->caps[i].service_id == service_id)
             return &reg->caps[i];

@@ -272,6 +272,96 @@ static void a_multibyte_write_is_recognised_when_echoed(void)
         CHECK_EQ(appl_reading(&a, 0x21)->raw_len, 4);
 }
 
+/*
+ * A link that forwards to the simulator but reports every multi-byte reply
+ * under the low byte of its service id -- what an adapter that narrowed the
+ * id would hand up. The model files a reading under the id the reply names,
+ * so this is the case where 0x0120 could be confused with 0x20.
+ */
+static result_t lowbyte_submit(void *self, const link_req_t *req)
+{
+    return link_submit((link_t *)self, req);
+}
+
+static result_t lowbyte_poll(void *self, link_resp_t *out)
+{
+    result_t r = link_poll((link_t *)self, out);
+
+    if (r == RES_OK && out->multibyte)
+        out->service_id = (uint16_t)(out->service_id & 0xFFu);
+    return r;
+}
+
+static bool lowbyte_is_up(void *self)
+{
+    return link_is_up((link_t *)self);
+}
+
+static void lowbyte_close(void *self)
+{
+    (void)self;
+}
+
+static const link_vt_t k_lowbyte_vt = {
+    lowbyte_submit, lowbyte_poll, lowbyte_is_up, lowbyte_close
+};
+
+/*
+ * 0x0120 and 0x0020 are two services on one multi-byte appliance, and each
+ * is polled and cached under its own id. A reply naming the wrong one is a
+ * failed read of the service asked about, never a reading of the other.
+ */
+static void a_two_byte_service_id_is_polled_under_its_own_id(void)
+{
+    sim_link_t          s;
+    link_t              l;
+    link_t              narrowed;
+    appliance_t         a;
+    const uint8_t       u16[] = { 0x00, 0x00, 0x27, 0x10 };
+    const appl_value_t *rd;
+    uint16_t            v = 0;
+
+    sim_link_init(&s, 0xE0);
+    CHECK_EQ(sim_link_set_identity(&s, TS_FORMAT_MULTIBYTE, TS_CLASS_SENSOR,
+                                   0x00E0, "ACME", "PM-1"), RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x0120, 0x21, false, 1111, u16, 4),
+             RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x0020, 0x21, false, 2222, u16, 4),
+             RES_OK);
+    sim_link_bind(&s, &l);
+    model(&a);
+
+    pump(&a, &l, 0, 20);
+    CHECK_EQ(appl_state(&a), APPL_READY);
+    CHECK_EQ(appl_sweeps(&a), 1);
+
+    CHECK_EQ(appl_value(&a, 0x0120, &v), RES_OK);
+    CHECK_EQ(v, 1111);
+    CHECK_EQ(appl_value(&a, 0x0020, &v), RES_OK);
+    CHECK_EQ(v, 2222);
+    CHECK_EQ(appl_value(&a, 0x0220, &v), RES_ENOTFOUND);
+    CHECK(appl_reading(&a, 0x00A0) == NULL);
+
+    /* Next sweep, through a link that narrows the id on the way up. */
+    s.services[0].value = 5555;
+    narrowed.vt   = &k_lowbyte_vt;
+    narrowed.self = &l;
+    pump(&a, &narrowed, 1000, 20);
+    CHECK_EQ(appl_sweeps(&a), 2);
+
+    /* 0x0020 did not take 0x0120's reading... */
+    CHECK_EQ(appl_value(&a, 0x0020, &v), RES_OK);
+    CHECK_EQ(v, 2222);
+
+    /* ...and 0x0120 counts it as a miss, keeping what it last read. */
+    rd = appl_reading(&a, 0x0120);
+    CHECK(rd != NULL);
+    if (rd) {
+        CHECK_EQ(rd->misses, 1);
+        CHECK_EQ(rd->value, 1111);
+    }
+}
+
 static void a_dropped_reply_is_retried(void)
 {
     sim_link_t  s;
@@ -623,6 +713,7 @@ void test_appliance(void)
     a_second_sweep_waits_for_its_interval();
     a_multibyte_appliance_is_polled();
     a_multibyte_write_is_recognised_when_echoed();
+    a_two_byte_service_id_is_polled_under_its_own_id();
     a_dropped_reply_is_retried();
     a_link_that_goes_down_invalidates_the_cache();
     repeated_failure_takes_the_appliance_down_and_backs_off();
