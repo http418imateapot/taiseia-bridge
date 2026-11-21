@@ -11,7 +11,7 @@
  * WHAT THE STANDARD SETTLES, AND WHAT IT DOES NOT.
  *
  * For a multi-byte reply it is explicit: every fragment carries the same
- * header, its own fragment number at bytes 4 and 5, and the count of the items
+ * header, its own fragment number at bytes 7 and 8, and the count of the items
  * *in that fragment*. Concatenating the data fields and summing the counts is
  * the whole of it.
  *
@@ -64,6 +64,8 @@ void ts_reasm_begin(ts_reasm_t *r, ts_reply_kind_t kind);
  * Refuses rather than assembles something plausible: a fragment number that
  * does not count down, more bytes than the buffer holds, a packet that does
  * not decode, or a continuation that is missing the header it must repeat.
+ * A multi-byte reply whose service id is wider than the link port's seven
+ * bits is RES_EUNSUPPORTED.
  */
 result_t ts_reasm_add(ts_reasm_t *r, const uint8_t *pkt, size_t len);
 

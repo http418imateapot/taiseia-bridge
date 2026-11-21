@@ -102,26 +102,36 @@ result_t ts_parse_response(const uint8_t *buf, size_t len, ts_frame_t *out);
  *
  * Appliances that report values wider than two bytes -- meters and sensors --
  * use a longer header carrying the data type and item count that the general
- * format has nowhere to put:
+ * format has nowhere to put. CNS 16014:2025 tables 14 and 15:
  *
  *     byte 0        packet length
  *     byte 1        SA id
- *     byte 2        bit 7 = write, bits 6..0 = service id
- *     byte 3        reserved, 0xFF
- *     byte 4..5     fragment number, big endian; 0 means this is the last
- *     byte 6        data type code
- *     byte 7..8     item count, big endian
- *     byte 9..n-2   data
+ *     byte 2        service type: bit 7 = write, bits 6..0 reserved (0)
+ *     byte 3..4     service id, big endian
+ *     byte 5..6     reserved, 0x0000 by default
+ *     byte 7..8     fragment number, big endian; 0 means this is the last
+ *     byte 9        data type code
+ *     byte 10..11   item count, big endian
+ *     byte 12..n-2  data
  *     byte n-1      checksum
+ *
+ * The service id is NOT in byte 2 here, as it is in the general format. An
+ * earlier version of this file put it there and was three bytes short from
+ * the reserved field on; the simulator, built on the same functions, agreed.
+ *
+ * The reserved bits and bytes are written as zero and reported as received,
+ * never refused: they are kept for future extension, and a later revision that
+ * uses them should not make every reply from a newer appliance unreadable.
  *
  * Registration is NOT in this format even for these appliances: the standard
  * keeps that exchange in the general shape for both directions.
  */
 typedef struct {
     uint8_t        sa_id;
-    uint8_t        service_id;
+    uint16_t       service_id;   /* the full two-byte field, as received */
     bool           write;
-    uint8_t        reserved;
+    uint8_t        service_type; /* byte 2 as received, write bit included */
+    uint16_t       reserved;
     uint16_t       fragment;
     uint8_t        dtype;
     uint16_t       count;
@@ -135,20 +145,24 @@ typedef struct {
  * The item count is 0xFFFF and the data field is one item wide with every byte
  * 0xFF -- we are asking, not telling, and the appliance decides how many items
  * come back. `value_len` is the type's width, from the data type table.
+ *
+ * `service_id` takes the whole two-byte field the format provides; nothing
+ * here narrows it.
  */
 result_t ts_build_mb_read(uint8_t *out, size_t cap, size_t *out_len,
-                          uint8_t sa_id, uint8_t service_id,
+                          uint8_t sa_id, uint16_t service_id,
                           uint8_t dtype, size_t value_len);
 
 /** Build a multi-byte write request carrying `count` items. */
 result_t ts_build_mb_write(uint8_t *out, size_t cap, size_t *out_len,
-                           uint8_t sa_id, uint8_t service_id,
+                           uint8_t sa_id, uint16_t service_id,
                            uint8_t dtype, uint16_t count,
                            const uint8_t *data, size_t data_len);
 
 /**
- * Decode a multi-byte reply. Validates length, the reserved byte's presence
- * and the checksum. `out->data` aliases `buf`.
+ * Decode a multi-byte reply. Validates the declared length against `len`, that
+ * the whole header is present, and the checksum. The reserved fields are
+ * reported, not checked. `out->data` aliases `buf`.
  */
 result_t ts_parse_mb_response(const uint8_t *buf, size_t len,
                               ts_mb_frame_t *out);
@@ -158,7 +172,7 @@ result_t ts_parse_mb_response(const uint8_t *buf, size_t len,
  *
  * Where it lives depends on the format, and the caller knows which it asked
  * for: byte 3 of a registration payload holds it in the high nibble, a
- * multi-byte reply keeps it in bytes 4 and 5, and a general reply cannot
+ * multi-byte reply keeps it in bytes 7 and 8, and a general reply cannot
  * fragment at all.
  */
 typedef enum {

@@ -59,6 +59,16 @@
 
 #define TS_REG_GENERAL_RECORD  3u   /* service byte + two support bytes */
 
+/*
+ * A multi-byte record, CNS 16014:2025 table 24: a service type byte (bit 7 is
+ * the access direction, bits 6..0 reserved), a two-byte service id, the data
+ * type code, then the support data, whose width the type code decides. This
+ * is what precedes the support data.
+ */
+#define TS_REG_MB_RECORD_HEADER 4u
+#define TS_REG_MB_OFF_ID        1u  /* two bytes, big endian */
+#define TS_REG_MB_OFF_DTYPE     3u
+
 typedef enum {
     TS_FORMAT_GENERAL = 0,   /* 3-byte records, no type code            */
     TS_FORMAT_MULTIBYTE      /* type code present, variable support data */
@@ -104,7 +114,9 @@ typedef struct {
  *                     stream that does not divide evenly, or more services
  *                     than TS_MAX_CAPABILITIES
  *   RES_EUNSUPPORTED  well formed but not decodable here: a fragmented reply,
- *                     or a record whose type code has no fixed support width.
+ *                     a record whose type code has no fixed support width, or
+ *                     a multi-byte service id above TS_SVC_ID_MAX, which
+ *                     nothing above this layer can hold.
  *                     The header fields are filled in before returning, so a
  *                     caller can log which case it hit.
  */

@@ -203,7 +203,7 @@ static result_t build_registration(const sim_link_t *s, uint8_t *out,
     for (i = 0; i < s->n_services; i++) {
         need += (s->format == TS_FORMAT_GENERAL)
                     ? TS_REG_GENERAL_RECORD
-                    : 2u + s->services[i].support_len;
+                    : TS_REG_MB_RECORD_HEADER + s->services[i].support_len;
     }
     if (need > cap)
         return RES_ETOOBIG;
@@ -222,10 +222,17 @@ static result_t build_registration(const sim_link_t *s, uint8_t *out,
     for (i = 0; i < s->n_services; i++) {
         const sim_service_t *svc = &s->services[i];
 
-        out[pos++] = (uint8_t)((svc->service_id & TS_SVC_ID_MASK) |
-                               (svc->writable ? TS_SVC_WRITE_BIT : 0u));
-        if (s->format == TS_FORMAT_MULTIBYTE)
+        if (s->format == TS_FORMAT_MULTIBYTE) {
+            /* Service type, then the id in two bytes of its own, then the
+             * type code. */
+            out[pos++] = (uint8_t)(svc->writable ? TS_SVC_WRITE_BIT : 0u);
+            out[pos++] = 0u;
+            out[pos++] = (uint8_t)(svc->service_id & TS_SVC_ID_MASK);
             out[pos++] = svc->dtype;
+        } else {
+            out[pos++] = (uint8_t)((svc->service_id & TS_SVC_ID_MASK) |
+                                   (svc->writable ? TS_SVC_WRITE_BIT : 0u));
+        }
 
         memcpy(&out[pos], svc->support, svc->support_len);
         pos += svc->support_len;
@@ -272,9 +279,13 @@ static result_t deliver(sim_link_t *s, uint32_t req_id, uint8_t *pkt,
             s->pending.status = RES_ETOOBIG;
             return RES_OK;
         }
+        if (m.service_id > TS_SVC_ID_MAX) {
+            s->pending.status = RES_EUNSUPPORTED;
+            return RES_OK;
+        }
         s->pending.status     = RES_OK;
         s->pending.sa_id      = m.sa_id;
-        s->pending.service_id = m.service_id;
+        s->pending.service_id = (uint8_t)m.service_id;
         s->pending.write      = m.write;
         s->pending.multibyte  = true;
         s->pending.dtype      = m.dtype;
@@ -419,8 +430,9 @@ static result_t reply_service_mb(sim_link_t *s, uint32_t req_id,
     if (r != RES_OK)
         return r;
 
-    /* A reply to a read does not carry the write bit. */
-    pkt[2] = (uint8_t)(pkt[2] & TS_SVC_ID_MASK);
+    /* A reply to a read does not carry the write bit, which in this format is
+     * the only thing in the service type byte. */
+    pkt[TS_MB_OFF_SERVICE_TYPE] = 0u;
     pkt[n - 1u] = ts_checksum(pkt, n - 1u);
 
     return deliver(s, req_id, pkt, n);
@@ -497,7 +509,9 @@ static result_t sim_submit(void *self, const link_req_t *req)
         if (r != RES_OK)
             return r;
 
-        svc = find_service(s, mb.service_id);
+        svc = (mb.service_id > TS_SVC_ID_MAX)
+                  ? NULL
+                  : find_service(s, (uint8_t)mb.service_id);
         if (!svc) {
             fail(s, req->id, RES_ENOTFOUND);
             return RES_OK;
