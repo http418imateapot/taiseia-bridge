@@ -15,24 +15,32 @@
 #include "core/taiseia/reassembly.h"
 #include "core/taiseia/registration.h"
 
-/* One multi-byte fragment: `n` items of one byte each, all valued `fill`. */
-static size_t mb_fragment(uint8_t *out, uint16_t fragment, uint8_t service,
+/*
+ * One multi-byte fragment: `n` items of one byte each, all valued `fill`.
+ * Written by hand at CNS 16014:2025 table 15's offsets rather than through the
+ * builder, so that a builder and a parser that agree on a wrong layout cannot
+ * pass here together.
+ */
+static size_t mb_fragment(uint8_t *out, uint16_t fragment, uint16_t service,
                           uint8_t dtype, uint16_t count, uint8_t fill)
 {
-    size_t len = TS_MB_OVERHEAD + count;
+    size_t len = 13u + count;
     size_t i;
 
-    out[0] = (uint8_t)len;
-    out[1] = 0xE0;
-    out[2] = service;
-    out[3] = TS_MB_RESERVED;
-    out[4] = (uint8_t)((fragment >> 8) & 0xFFu);
-    out[5] = (uint8_t)(fragment & 0xFFu);
-    out[6] = dtype;
-    out[7] = (uint8_t)((count >> 8) & 0xFFu);
-    out[8] = (uint8_t)(count & 0xFFu);
+    out[0]  = (uint8_t)len;
+    out[1]  = 0xE0;
+    out[2]  = 0x00;                                 /* service type: read */
+    out[3]  = (uint8_t)((service >> 8) & 0xFFu);
+    out[4]  = (uint8_t)(service & 0xFFu);
+    out[5]  = 0x00;                                 /* reserved           */
+    out[6]  = 0x00;
+    out[7]  = (uint8_t)((fragment >> 8) & 0xFFu);
+    out[8]  = (uint8_t)(fragment & 0xFFu);
+    out[9]  = dtype;
+    out[10] = (uint8_t)((count >> 8) & 0xFFu);
+    out[11] = (uint8_t)(count & 0xFFu);
     for (i = 0; i < count; i++)
-        out[TS_MB_DATA_OFFSET + i] = fill;
+        out[12u + i] = fill;
     out[len - 1u] = ts_checksum(out, len - 1u);
 
     return len;
@@ -166,6 +174,33 @@ static void interleaved_replies_are_refused(void)
 
     n = mb_fragment(pkt, 0, 0x20, 0x22, 2, 0x22);
     CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EFORMAT);
+}
+
+/*
+ * The format gives the service id two bytes; the link port holds seven bits.
+ * 0x0120 masked to seven bits is 0x20, a real service, so masking would hand
+ * one service's readings over as another's. It is refused instead.
+ */
+static void a_service_id_wider_than_the_port_is_refused(void)
+{
+    ts_reasm_t r;
+    uint8_t    pkt[64];
+    size_t     n;
+
+    ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
+    n = mb_fragment(pkt, 0, 0x0120, 0x20, 2, 0x11);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EUNSUPPORTED);
+    CHECK(!ts_reasm_complete(&r));
+
+    ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
+    n = mb_fragment(pkt, 0, 0x0080, 0x20, 2, 0x11);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_EUNSUPPORTED);
+
+    /* The widest id the port can carry still passes. */
+    ts_reasm_begin(&r, TS_REPLY_MULTIBYTE);
+    n = mb_fragment(pkt, 0, 0x007F, 0x20, 2, 0x11);
+    CHECK_EQ(ts_reasm_add(&r, pkt, n), RES_OK);
+    CHECK_EQ(r.service_id, 0x7F);
 }
 
 /* Past the buffer, the answer is a refusal. A truncated batch of readings
@@ -392,6 +427,7 @@ void test_reassembly(void)
     a_skipped_fragment_is_refused();
     a_repeated_fragment_is_refused();
     interleaved_replies_are_refused();
+    a_service_id_wider_than_the_port_is_refused();
     an_oversize_reply_is_refused_not_truncated();
     a_damaged_fragment_is_refused();
     registration_fragments_drop_the_repeated_header();

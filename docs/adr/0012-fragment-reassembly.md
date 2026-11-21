@@ -9,9 +9,15 @@ checksummed packet carrying a fragment number; the numbers count down and zero
 marks the last. Only the payloads join up.
 
 The standard settles this for a **multi-byte** reply. Every fragment repeats the
-same header, carries its own fragment number at bytes 4 and 5, and states the
-count of the items *in that fragment*. Concatenating the data fields and summing
-the counts is the whole of it.
+same header, carries its own fragment number at bytes 7 and 8 (CNS 16014:2025
+table 15), and states the count of the items *in that fragment*. Concatenating
+the data fields and summing the counts is the whole of it.
+
+*Correction.* This ADR first said bytes 4 and 5, which is where the code put
+them: the multi-byte header had been transcribed with the service id inside
+byte 2 and a one-byte reserved field, three bytes short of the standard's. The
+decision below is unaffected; the offsets were wrong, not the reading. See
+[testing.md](../testing.md) for why no test noticed.
 
 It does not settle it for a **registration** reply. There, the fragment number
 lives inside the payload, at a fixed offset within the six-byte header — which
@@ -71,7 +77,9 @@ connected to this code. The refusals above bound the damage — a mis-sliced
 continuation usually fails the header check or the record-length arithmetic —
 but they do not eliminate it.
 
-Multi-byte fragmentation carries no such doubt.
+Multi-byte fragmentation carries no such doubt about the reading. It did carry
+a transcription error in the header offsets, which no doubt about the reading
+would have caught.
 
 ## Alternatives rejected
 
