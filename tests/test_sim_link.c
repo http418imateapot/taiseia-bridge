@@ -322,6 +322,119 @@ static void a_multibyte_exchange_carries_wide_values(void)
     CHECK_EQ(s.services[0].value, 1234);
 }
 
+/*
+ * The multi-byte format gives a service id two bytes, and 0x0120 and 0x0020
+ * share a low byte. Through the simulator -- real packets both ways, the
+ * registration included -- each answers for itself and neither for the
+ * other.
+ */
+static void a_two_byte_service_id_crosses_the_wire_whole(void)
+{
+    sim_link_t        s;
+    link_t            l;
+    link_req_t        req;
+    link_resp_t       resp;
+    ts_registration_t reg;
+    const uint8_t     u16[] = { 0x00, 0x00, 0x27, 0x10 };   /* 0 .. 10000 */
+    uint8_t           item[2];
+
+    sim_link_init(&s, 0xE0);
+    CHECK_EQ(sim_link_set_identity(&s, TS_FORMAT_MULTIBYTE, TS_CLASS_SENSOR,
+                                   0x00E0, "ACME", "PM-1"), RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x0120, 0x21, true, 1111, u16, 4),
+             RES_OK);
+    CHECK_EQ(sim_link_add_service(&s, 0x0020, 0x21, true, 2222, u16, 4),
+             RES_OK);
+    sim_link_bind(&s, &l);
+
+    /* The registration reply carries both ids whole. */
+    memset(&req, 0, sizeof(req));
+    req.id = 70; req.op = LINK_OP_REGISTER;
+    CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(ts_registration_parse(resp.data, resp.data_len, &reg), RES_OK);
+    CHECK_EQ(reg.n_caps, 2);
+    CHECK_EQ(reg.caps[0].service_id, 0x0120);
+    CHECK_EQ(reg.caps[1].service_id, 0x0020);
+
+    /* A read of each comes back under its own id with its own value. */
+    memset(&req, 0, sizeof(req));
+    req.id = 71; req.op = LINK_OP_READ; req.sa_id = 0xE0;
+    req.service_id = 0x0120;
+    req.multibyte = true; req.dtype = 0x21; req.value_len = 2;
+    CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(resp.multibyte, 1);
+    CHECK_EQ(resp.service_id, 0x0120);
+    CHECK_EQ(resp.data_len, 2);
+    CHECK_EQ((resp.data[0] << 8) | resp.data[1], 1111);
+
+    req.id = 72; req.service_id = 0x0020;
+    CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(resp.service_id, 0x0020);
+    CHECK_EQ(resp.data_len, 2);
+    CHECK_EQ((resp.data[0] << 8) | resp.data[1], 2222);
+
+    /* Another id with the same low byte was never declared. */
+    req.id = 73; req.service_id = 0x0220;
+    CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_ENOTFOUND);
+
+    /* A write to 0x0120 lands there and leaves 0x0020 alone. */
+    item[0] = 0x10; item[1] = 0xE1;                       /* 4321 */
+    memset(&req, 0, sizeof(req));
+    req.id = 74; req.op = LINK_OP_WRITE; req.sa_id = 0xE0;
+    req.service_id = 0x0120;
+    req.multibyte = true; req.dtype = 0x21; req.value_len = 2;
+    req.count = 1; req.data = item; req.data_len = sizeof(item);
+    CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(resp.write, 1);
+    CHECK_EQ(resp.service_id, 0x0120);
+    CHECK_EQ(s.services[0].value, 4321);
+    CHECK_EQ(s.services[1].value, 2222);
+}
+
+/*
+ * The general format has seven bits for the id. A wider one can be neither
+ * declared nor asked for there -- and asking is refused before anything is
+ * sent, rather than going out as the service its low bits name.
+ */
+static void a_general_appliance_takes_no_id_past_seven_bits(void)
+{
+    sim_link_t  s;
+    link_t      l;
+    link_req_t  req;
+    link_resp_t resp;
+
+    sim_link_init(&s, 0x04);
+    CHECK_EQ(sim_link_add_service(&s, 0x0120, 0, true, 1,
+                                  k_sup_range, sizeof(k_sup_range)),
+             RES_EINVAL);
+    CHECK_EQ(sim_link_add_service(&s, 0x20, 0, true, 7,
+                                  k_sup_range, sizeof(k_sup_range)), RES_OK);
+    sim_link_bind(&s, &l);
+
+    memset(&req, 0, sizeof(req));
+    req.id = 80; req.op = LINK_OP_READ; req.sa_id = 0x04;
+    req.service_id = 0x0120;
+    CHECK_EQ(link_submit(&l, &req), RES_EINVAL);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+
+    req.id = 81; req.op = LINK_OP_WRITE; req.value = 9;
+    CHECK_EQ(link_submit(&l, &req), RES_EINVAL);
+    CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
+    CHECK_EQ(s.services[0].value, 7);
+
+    /* The seven-bit id itself still works. */
+    req.id = 82; req.op = LINK_OP_READ; req.service_id = 0x20;
+    CHECK_EQ(exchange(&l, &req, &resp), RES_OK);
+    CHECK_EQ(resp.status, RES_OK);
+    CHECK_EQ(resp.service_id, 0x20);
+    CHECK_EQ((resp.data[0] << 8) | resp.data[1], 7);
+}
+
 /* A request that says "multi-byte" without a usable type is refused, not sent.
  * This is what an uninitialised request looks like from the inside. */
 static void a_multibyte_request_without_a_type_is_refused(void)
@@ -435,6 +548,8 @@ void test_sim_link(void)
     a_registration_reply_is_framed_as_one();
     a_raw_registration_overrides_the_assembled_one();
     a_multibyte_exchange_carries_wide_values();
+    a_two_byte_service_id_crosses_the_wire_whole();
+    a_general_appliance_takes_no_id_past_seven_bits();
     a_multibyte_request_without_a_type_is_refused();
     capacity_and_argument_limits_hold();
     the_dispatcher_tolerates_a_null_link();

@@ -91,12 +91,15 @@
  * of its own; see above.
  *
  * Everything above the frame layer -- capabilities, the appliance model, the
- * link port, MQTT -- holds a service id in seven bits. A multi-byte id wider
- * than that is refused where it enters, never truncated into another service.
+ * link port, MQTT -- holds a service id as uint16_t, wide enough for either
+ * format. TS_SVC_ID_MAX is the general format's ceiling: its builders refuse
+ * an id above it rather than mask it, so 0x0120 can never go out as 0x20.
+ * TS_MB_SVC_ID_MAX is the widest id any format can name.
  */
 #define TS_SVC_ID_MASK          0x7Fu
 #define TS_SVC_WRITE_BIT        0x80u
 #define TS_SVC_ID_MAX           TS_SVC_ID_MASK
+#define TS_MB_SVC_ID_MAX        0xFFFFu
 
 /* SA id 0x00 is reserved for the registration exchange, through which an
  * appliance reports its own class, protocol version, make, model and the set
@@ -137,6 +140,7 @@ TS_STATIC_ASSERT(TS_FRAME_MAX_LEN < 255u,                max_len_reserves_ff);
 TS_STATIC_ASSERT(TS_GENERAL_REQ_LEN >= TS_FRAME_MIN_LEN, general_req_is_valid);
 TS_STATIC_ASSERT(TS_DATA_MAX > 0,                        data_max_positive);
 TS_STATIC_ASSERT((TS_SVC_ID_MASK & TS_SVC_WRITE_BIT) == 0, service_byte_split);
+TS_STATIC_ASSERT(TS_MB_SVC_ID_MAX > TS_SVC_ID_MAX,       mb_svc_id_is_wider);
 TS_STATIC_ASSERT(TS_REG_FRAME_OVERHEAD < TS_FRAME_OVERHEAD,  reg_has_no_svc_byte);
 TS_STATIC_ASSERT(TS_DATA_MAX >= TS_FRAME_MAX_LEN - TS_FRAME_OVERHEAD,
                                                              data_max_covers_all);

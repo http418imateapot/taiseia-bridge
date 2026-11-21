@@ -43,6 +43,15 @@ names, no enumerated strings. Interpreting them needs the per-appliance service
 tables, which are not in this repository — see
 [adr/0003](adr/0003-no-service-tables.md).
 
+A service identifier is written in decimal wherever it appears: an attribute
+key, a result key, a capability `id`. How wide it can be depends on the
+appliance's record format. A general-format appliance has seven bits, so 0 to
+127. A multi-byte appliance has two bytes, so 0 to 65535, and `"288"` (0x0120)
+is a different service from `"32"` (0x20). No id is ever masked to fit.
+
+The JSON shapes are the same for both formats. A consumer that assumed keys
+stop at 127 needs to accept up to five digits for a multi-byte appliance.
+
 ## 3. Telemetry
 
 ```jsonc
@@ -208,6 +217,13 @@ and nothing reads it. Turning it on changes nothing about what is published.
 ```
 
 `success` is true only when every item was written.
+
+An attribute key must be a service identifier in plain decimal: no leading
+zeros, no sign, no spaces, no hex, and no larger than 65535. Any other key
+rejects the whole command. A key in range that the appliance did not declare
+comes back as `unknown` and costs no round trip. That includes any key above
+127 sent to a general-format appliance. Earlier versions rejected keys above
+127 outright; those keys now get the per-item `unknown` result instead.
 
 `tag` is echoed back byte for byte, whatever its JSON type, so a consumer may
 correlate however it likes.

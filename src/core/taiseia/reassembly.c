@@ -71,15 +71,11 @@ result_t ts_reasm_add(ts_reasm_t *r, const uint8_t *pkt, size_t len)
         if (res != RES_OK)
             return res;
 
-        /* The link port carries a seven-bit service id. A reply naming one
-         * wider than that answers nothing we could have asked, and masking it
-         * would attribute it to some other service. */
-        if (f.service_id > TS_SVC_ID_MAX)
-            return RES_EUNSUPPORTED;
-
+        /* The whole sixteen-bit id is kept and compared, so a fragment for
+         * 0x0120 can never be joined onto a reply for 0x20. */
         if (!r->started) {
             r->sa_id      = f.sa_id;
-            r->service_id = (uint8_t)f.service_id;
+            r->service_id = f.service_id;
             r->write      = f.write;
             r->dtype      = f.dtype;
         } else if (f.service_id != r->service_id || f.dtype != r->dtype) {
