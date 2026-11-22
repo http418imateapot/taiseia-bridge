@@ -41,7 +41,8 @@ typedef struct {
     uint32_t  id;          /* caller's correlation id, echoed in the reply  */
     link_op_t op;
     uint8_t   sa_id;
-    uint8_t   service_id;
+    uint16_t  service_id;  /* seven bits in the general format, sixteen in
+                              the multi-byte one; never masked by an adapter */
     uint16_t  value;       /* LINK_OP_WRITE, general format only            */
 
     /*
@@ -61,7 +62,7 @@ typedef struct {
     uint32_t id;           /* the id of the request this answers            */
     result_t status;       /* RES_OK, or why the exchange failed            */
     uint8_t  sa_id;
-    uint8_t  service_id;
+    uint16_t service_id;   /* as the reply named it, all sixteen bits       */
     bool     write;
 
     /* Set when the reply came back in the multi-byte format. */

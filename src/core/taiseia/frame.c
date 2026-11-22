@@ -43,7 +43,7 @@ static result_t build_general(uint8_t *out, size_t cap, size_t *out_len,
 }
 
 result_t ts_build_read(uint8_t *out, size_t cap, size_t *out_len,
-                       uint8_t sa_id, uint8_t service_id)
+                       uint8_t sa_id, uint16_t service_id)
 {
     if (service_id > TS_SVC_ID_MAX)
         return RES_EINVAL;
@@ -54,7 +54,7 @@ result_t ts_build_read(uint8_t *out, size_t cap, size_t *out_len,
 }
 
 result_t ts_build_write(uint8_t *out, size_t cap, size_t *out_len,
-                        uint8_t sa_id, uint8_t service_id, uint16_t value)
+                        uint8_t sa_id, uint16_t service_id, uint16_t value)
 {
     if (service_id > TS_SVC_ID_MAX)
         return RES_EINVAL;
@@ -159,13 +159,25 @@ result_t ts_parse_response(const uint8_t *buf, size_t len, ts_frame_t *out)
 
 /* ------------------------------------------------- multi-byte data format --
  *
- * The header is fixed at nine bytes and the data field follows it, so the
- * whole packet is TS_MB_OVERHEAD plus however much data there is.
+ * The header is fixed at TS_MB_DATA_OFFSET bytes and the data field follows
+ * it, so the whole packet is TS_MB_OVERHEAD plus however much data there is.
+ * The offsets are named in limits.h and nowhere else.
  */
+static uint16_t get_be16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
+}
+
+static void put_be16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)((v >> 8) & 0xFFu);
+    p[1] = (uint8_t)(v & 0xFFu);
+}
+
 static result_t build_mb(uint8_t *out, size_t cap, size_t *out_len,
-                         uint8_t sa_id, uint8_t service_byte, uint8_t dtype,
-                         uint16_t count, const uint8_t *data, size_t data_len,
-                         uint8_t fill)
+                         uint8_t sa_id, bool write, uint16_t service_id,
+                         uint8_t dtype, uint16_t count, const uint8_t *data,
+                         size_t data_len, uint8_t fill)
 {
     size_t len = TS_MB_OVERHEAD + data_len;
 
@@ -178,13 +190,13 @@ static result_t build_mb(uint8_t *out, size_t cap, size_t *out_len,
 
     out[0] = (uint8_t)len;
     out[1] = sa_id;
-    out[2] = service_byte;
-    out[3] = TS_MB_RESERVED;
-    out[4] = 0;                       /* fragment: we never send one */
-    out[5] = 0;
-    out[6] = dtype;
-    out[7] = (uint8_t)((count >> 8) & 0xFFu);
-    out[8] = (uint8_t)(count & 0xFFu);
+    /* Bits 6..0 of the service type are reserved and written as zero. */
+    out[TS_MB_OFF_SERVICE_TYPE] = (uint8_t)(write ? TS_SVC_WRITE_BIT : 0u);
+    put_be16(&out[TS_MB_OFF_SERVICE_ID], service_id);
+    put_be16(&out[TS_MB_OFF_RESERVED], (uint16_t)TS_MB_RESERVED);
+    put_be16(&out[TS_MB_OFF_FRAGMENT], 0u);   /* we never send a fragment */
+    out[TS_MB_OFF_DTYPE] = dtype;
+    put_be16(&out[TS_MB_OFF_COUNT], count);
 
     if (data)
         memcpy(&out[TS_MB_DATA_OFFSET], data, data_len);
@@ -198,37 +210,30 @@ static result_t build_mb(uint8_t *out, size_t cap, size_t *out_len,
 }
 
 result_t ts_build_mb_read(uint8_t *out, size_t cap, size_t *out_len,
-                          uint8_t sa_id, uint8_t service_id,
+                          uint8_t sa_id, uint16_t service_id,
                           uint8_t dtype, size_t value_len)
 {
-    if (service_id > TS_SVC_ID_MAX)
-        return RES_EINVAL;
     /* A read still carries a data field, one item wide, every byte 0xFF. A
      * zero-width type has no such field to describe and cannot be asked for
      * this way. */
     if (value_len == 0 || value_len > TS_DATA_MAX)
         return RES_EINVAL;
 
-    return build_mb(out, cap, out_len, sa_id,
-                    (uint8_t)(service_id & TS_SVC_ID_MASK), dtype,
+    return build_mb(out, cap, out_len, sa_id, false, service_id, dtype,
                     (uint16_t)TS_MB_COUNT_UNSPECIFIED, NULL, value_len,
                     TS_READ_FILL);
 }
 
 result_t ts_build_mb_write(uint8_t *out, size_t cap, size_t *out_len,
-                           uint8_t sa_id, uint8_t service_id,
+                           uint8_t sa_id, uint16_t service_id,
                            uint8_t dtype, uint16_t count,
                            const uint8_t *data, size_t data_len)
 {
-    if (service_id > TS_SVC_ID_MAX)
-        return RES_EINVAL;
     if (!data || data_len == 0 || data_len > TS_DATA_MAX)
         return RES_EINVAL;
 
-    return build_mb(out, cap, out_len, sa_id,
-                    (uint8_t)((service_id & TS_SVC_ID_MASK) |
-                              TS_SVC_WRITE_BIT),
-                    dtype, count, data, data_len, 0);
+    return build_mb(out, cap, out_len, sa_id, true, service_id, dtype, count,
+                    data, data_len, 0);
 }
 
 result_t ts_parse_mb_response(const uint8_t *buf, size_t len,
@@ -255,14 +260,15 @@ result_t ts_parse_mb_response(const uint8_t *buf, size_t len,
     if (ts_checksum(buf, len - 1u) != buf[len - 1u])
         return RES_EFORMAT;
 
-    out->sa_id      = buf[1];
-    out->service_id = (uint8_t)(buf[2] & TS_SVC_ID_MASK);
-    out->write      = (buf[2] & TS_SVC_WRITE_BIT) != 0;
-    out->reserved   = buf[3];
-    out->fragment   = (uint16_t)(((uint16_t)buf[4] << 8) | buf[5]);
-    out->dtype      = buf[6];
-    out->count      = (uint16_t)(((uint16_t)buf[7] << 8) | buf[8]);
-    out->data       = &buf[TS_MB_DATA_OFFSET];
+    out->sa_id        = buf[1];
+    out->service_type = buf[TS_MB_OFF_SERVICE_TYPE];
+    out->write        = (buf[TS_MB_OFF_SERVICE_TYPE] & TS_SVC_WRITE_BIT) != 0;
+    out->service_id   = get_be16(&buf[TS_MB_OFF_SERVICE_ID]);
+    out->reserved     = get_be16(&buf[TS_MB_OFF_RESERVED]);
+    out->fragment     = get_be16(&buf[TS_MB_OFF_FRAGMENT]);
+    out->dtype        = buf[TS_MB_OFF_DTYPE];
+    out->count        = get_be16(&buf[TS_MB_OFF_COUNT]);
+    out->data         = &buf[TS_MB_DATA_OFFSET];
     out->data_len   = len - TS_MB_OVERHEAD;
 
     return RES_OK;
@@ -278,7 +284,7 @@ result_t ts_reply_fragment(const uint8_t *buf, size_t len,
     case TS_REPLY_MULTIBYTE:
         if (len < TS_MB_OVERHEAD)
             return RES_EFORMAT;
-        *fragment = (uint16_t)(((uint16_t)buf[4] << 8) | buf[5]);
+        *fragment = get_be16(&buf[TS_MB_OFF_FRAGMENT]);
         return RES_OK;
 
     case TS_REPLY_REGISTRATION:

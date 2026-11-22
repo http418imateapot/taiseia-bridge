@@ -9,7 +9,7 @@
 
 #include <string.h>
 
-static sim_service_t *find_service(sim_link_t *s, uint8_t id)
+static sim_service_t *find_service(sim_link_t *s, uint16_t id)
 {
     size_t i;
 
@@ -67,7 +67,7 @@ result_t sim_link_set_identity(sim_link_t *s, ts_format_t format,
     return RES_OK;
 }
 
-result_t sim_link_add_service(sim_link_t *s, uint8_t service_id, uint8_t dtype,
+result_t sim_link_add_service(sim_link_t *s, uint16_t service_id, uint8_t dtype,
                               bool writable, uint16_t value,
                               const uint8_t *support, size_t support_len)
 {
@@ -75,7 +75,9 @@ result_t sim_link_add_service(sim_link_t *s, uint8_t service_id, uint8_t dtype,
 
     if (!s || !support)
         return RES_EINVAL;
-    if (service_id > TS_SVC_ID_MAX)
+    /* A general-format record has seven bits for the id; the multi-byte one
+     * has sixteen, all of which uint16_t holds. */
+    if (s->format == TS_FORMAT_GENERAL && service_id > TS_SVC_ID_MAX)
         return RES_EINVAL;
     if (support_len == 0u || support_len > TS_SUPPORT_MAX_BYTES)
         return RES_EINVAL;
@@ -136,14 +138,14 @@ void sim_link_corrupt_next(sim_link_t *s)
         s->corrupt_next = true;
 }
 
-result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to)
+result_t sim_link_set_clamp(sim_link_t *s, uint16_t service_id, uint16_t to)
 {
     sim_service_t *svc;
 
     if (!s)
         return RES_EINVAL;
 
-    svc = find_service(s, (uint8_t)(service_id & TS_SVC_ID_MASK));
+    svc = find_service(s, service_id);
     if (!svc)
         return RES_ENOTFOUND;
 
@@ -153,14 +155,14 @@ result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to)
     return RES_OK;
 }
 
-result_t sim_link_set_items(sim_link_t *s, uint8_t service_id, uint16_t n)
+result_t sim_link_set_items(sim_link_t *s, uint16_t service_id, uint16_t n)
 {
     sim_service_t *svc;
 
     if (!s || n == 0u)
         return RES_EINVAL;
 
-    svc = find_service(s, (uint8_t)(service_id & TS_SVC_ID_MASK));
+    svc = find_service(s, service_id);
     if (!svc)
         return RES_ENOTFOUND;
 
@@ -203,7 +205,7 @@ static result_t build_registration(const sim_link_t *s, uint8_t *out,
     for (i = 0; i < s->n_services; i++) {
         need += (s->format == TS_FORMAT_GENERAL)
                     ? TS_REG_GENERAL_RECORD
-                    : 2u + s->services[i].support_len;
+                    : TS_REG_MB_RECORD_HEADER + s->services[i].support_len;
     }
     if (need > cap)
         return RES_ETOOBIG;
@@ -222,10 +224,21 @@ static result_t build_registration(const sim_link_t *s, uint8_t *out,
     for (i = 0; i < s->n_services; i++) {
         const sim_service_t *svc = &s->services[i];
 
-        out[pos++] = (uint8_t)((svc->service_id & TS_SVC_ID_MASK) |
-                               (svc->writable ? TS_SVC_WRITE_BIT : 0u));
-        if (s->format == TS_FORMAT_MULTIBYTE)
+        if (s->format == TS_FORMAT_MULTIBYTE) {
+            /* Service type, then the id in two bytes of its own, big
+             * endian, then the type code. */
+            out[pos++] = (uint8_t)(svc->writable ? TS_SVC_WRITE_BIT : 0u);
+            out[pos++] = (uint8_t)((svc->service_id >> 8) & 0xFFu);
+            out[pos++] = (uint8_t)(svc->service_id & 0xFFu);
             out[pos++] = svc->dtype;
+        } else {
+            /* Added under the multi-byte format and then switched: refuse
+             * rather than mask a wide id into a general record. */
+            if (svc->service_id > TS_SVC_ID_MAX)
+                return RES_EINVAL;
+            out[pos++] = (uint8_t)((svc->service_id & TS_SVC_ID_MASK) |
+                                   (svc->writable ? TS_SVC_WRITE_BIT : 0u));
+        }
 
         memcpy(&out[pos], svc->support, svc->support_len);
         pos += svc->support_len;
@@ -419,8 +432,9 @@ static result_t reply_service_mb(sim_link_t *s, uint32_t req_id,
     if (r != RES_OK)
         return r;
 
-    /* A reply to a read does not carry the write bit. */
-    pkt[2] = (uint8_t)(pkt[2] & TS_SVC_ID_MASK);
+    /* A reply to a read does not carry the write bit, which in this format is
+     * the only thing in the service type byte. */
+    pkt[TS_MB_OFF_SERVICE_TYPE] = 0u;
     pkt[n - 1u] = ts_checksum(pkt, n - 1u);
 
     return deliver(s, req_id, pkt, n);

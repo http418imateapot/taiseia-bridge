@@ -31,7 +31,7 @@
 #include <stdint.h>
 
 typedef struct {
-    uint8_t  service_id;
+    uint16_t service_id;  /* up to 0x7F general, the whole 16 bits multi-byte */
     uint8_t  dtype;       /* a code from core/taiseia/datatype.h;
                              ignored in the general record format          */
     bool     writable;
@@ -90,8 +90,12 @@ result_t sim_link_set_identity(sim_link_t *s, ts_format_t format,
  * general record format it must be two bytes; in the multi-byte format it must
  * match the width the type code implies, which is what the decoder will
  * expect. RES_EINVAL if it does not.
+ *
+ * The id has the record format's width: seven bits in the general format,
+ * where a wider one is RES_EINVAL, and sixteen in the multi-byte one. Set the
+ * format with sim_link_set_identity first.
  */
-result_t sim_link_add_service(sim_link_t *s, uint8_t service_id, uint8_t dtype,
+result_t sim_link_add_service(sim_link_t *s, uint16_t service_id, uint8_t dtype,
                               bool writable, uint16_t value,
                               const uint8_t *support, size_t support_len);
 
@@ -114,7 +118,7 @@ void sim_link_corrupt_next(sim_link_t *s);
  * requester did not send, which is the only signal the protocol gives that a
  * write was not taken as asked.
  */
-result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to);
+result_t sim_link_set_clamp(sim_link_t *s, uint16_t service_id, uint16_t to);
 
 /**
  * Make one service answer a read with `n` copies of its value.
@@ -124,7 +128,7 @@ result_t sim_link_set_clamp(sim_link_t *s, uint8_t service_id, uint16_t to);
  * not an edge one. Ignored in the general record format, which has room for
  * exactly one two-byte value.
  */
-result_t sim_link_set_items(sim_link_t *s, uint8_t service_id, uint16_t n);
+result_t sim_link_set_items(sim_link_t *s, uint16_t service_id, uint16_t n);
 
 /** Take the link down, as a pulled cable would. */
 void sim_link_set_down(sim_link_t *s);

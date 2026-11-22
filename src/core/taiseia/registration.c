@@ -68,10 +68,10 @@ static size_t record_len(ts_format_t format, const uint8_t *rec, size_t avail,
     if (format == TS_FORMAT_GENERAL)
         return (avail >= TS_REG_GENERAL_RECORD) ? TS_REG_GENERAL_RECORD : 0u;
 
-    if (avail < 2u)
+    if (avail < TS_REG_MB_RECORD_HEADER)
         return 0u;
 
-    t = ts_datatype(rec[1]);
+    t = ts_datatype(rec[TS_REG_MB_OFF_DTYPE]);
     if (!t) {
         /* Without the type we cannot know the record's width, so the rest of
          * the stream is unreadable too. Refuse the whole reply rather than
@@ -90,7 +90,7 @@ static size_t record_len(ts_format_t format, const uint8_t *rec, size_t avail,
         return 0u;
     }
 
-    return 2u + t->support_len;
+    return TS_REG_MB_RECORD_HEADER + t->support_len;
 }
 
 result_t ts_registration_parse(const uint8_t *data, size_t len,
@@ -157,20 +157,27 @@ result_t ts_registration_parse(const uint8_t *data, size_t len,
         }
 
         cap = &out->caps[out->n_caps];
-        cap->service_id  = (uint8_t)(data[pos] & TS_SVC_ID_MASK);
         cap->writable    = (data[pos] & TS_SVC_WRITE_BIT) != 0;
 
         if (out->format == TS_FORMAT_GENERAL) {
+            cap->service_id  = (uint8_t)(data[pos] & TS_SVC_ID_MASK);
             cap->dtype_known = false;
             cap->dtype       = 0;
             cap->support[0]  = data[pos + 1u];
             cap->support[1]  = data[pos + 2u];
             cap->support_len = 2u;
         } else {
+            uint16_t id = (uint16_t)(((uint16_t)data[pos + TS_REG_MB_OFF_ID] << 8) |
+                                     data[pos + TS_REG_MB_OFF_ID + 1u]);
+
+            /* All sixteen bits are the id, and all sixteen are kept. Bits
+             * 6..0 of the service type byte are reserved and are not read. */
+            cap->service_id  = id;
             cap->dtype_known = true;
-            cap->dtype       = data[pos + 1u];
-            cap->support_len = n - 2u;
-            memcpy(cap->support, &data[pos + 2u], cap->support_len);
+            cap->dtype       = data[pos + TS_REG_MB_OFF_DTYPE];
+            cap->support_len = n - TS_REG_MB_RECORD_HEADER;
+            memcpy(cap->support, &data[pos + TS_REG_MB_RECORD_HEADER],
+                   cap->support_len);
         }
 
         out->n_caps++;
@@ -181,15 +188,15 @@ result_t ts_registration_parse(const uint8_t *data, size_t len,
 }
 
 const ts_capability_t *ts_registration_find(const ts_registration_t *reg,
-                                            uint8_t service_id)
+                                            uint16_t service_id)
 {
     size_t i;
 
     if (!reg)
         return NULL;
 
-    service_id = (uint8_t)(service_id & TS_SVC_ID_MASK);
-
+    /* No masking: narrowing the id here is exactly how 0x0120 would come to
+     * answer for 0x20. */
     for (i = 0; i < reg->n_caps; i++) {
         if (reg->caps[i].service_id == service_id)
             return &reg->caps[i];

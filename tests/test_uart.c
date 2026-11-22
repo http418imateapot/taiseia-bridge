@@ -519,25 +519,31 @@ static void a_write_failure_ends_the_exchange(void)
 
 /* ------------------------------------------------------- multi-byte replies */
 
-/* One multi-byte fragment carrying `count` single-byte items of `fill`. */
+/*
+ * One multi-byte fragment carrying `count` single-byte items of `fill`, written
+ * by hand at CNS 16014:2025 table 15's offsets rather than through the builder.
+ */
 static size_t mb_reply(uint8_t *out, uint16_t fragment, uint8_t sa,
                        uint8_t service, uint8_t dtype, uint16_t count,
                        uint8_t fill)
 {
-    size_t len = TS_MB_OVERHEAD + count;
+    size_t len = 13u + count;
     size_t i;
 
-    out[0] = (uint8_t)len;
-    out[1] = sa;
-    out[2] = service;
-    out[3] = TS_MB_RESERVED;
-    out[4] = (uint8_t)((fragment >> 8) & 0xFFu);
-    out[5] = (uint8_t)(fragment & 0xFFu);
-    out[6] = dtype;
-    out[7] = (uint8_t)((count >> 8) & 0xFFu);
-    out[8] = (uint8_t)(count & 0xFFu);
+    out[0]  = (uint8_t)len;
+    out[1]  = sa;
+    out[2]  = 0x00;                                 /* service type: read */
+    out[3]  = 0x00;                                 /* service id, high   */
+    out[4]  = service;
+    out[5]  = 0x00;                                 /* reserved           */
+    out[6]  = 0x00;
+    out[7]  = (uint8_t)((fragment >> 8) & 0xFFu);
+    out[8]  = (uint8_t)(fragment & 0xFFu);
+    out[9]  = dtype;
+    out[10] = (uint8_t)((count >> 8) & 0xFFu);
+    out[11] = (uint8_t)(count & 0xFFu);
     for (i = 0; i < count; i++)
-        out[TS_MB_DATA_OFFSET + i] = fill;
+        out[12u + i] = fill;
     out[len - 1u] = ts_checksum(out, len - 1u);
 
     return len;
@@ -563,15 +569,21 @@ static void a_multibyte_read_asks_in_the_wider_layout(void)
     CHECK_EQ(link_submit(&l, &req), RES_OK);
     CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
 
-    CHECK_EQ(f.out_len, TS_MB_OVERHEAD + 2u);
-    CHECK_EQ(f.out[0], TS_MB_OVERHEAD + 2u);
-    CHECK_EQ(f.out[2], 0x20);                 /* read: no write bit        */
-    CHECK_EQ(f.out[3], TS_MB_RESERVED);
-    CHECK_EQ(f.out[6], 0x21);
-    CHECK_EQ(f.out[7], 0xFF);                 /* asking, not telling       */
-    CHECK_EQ(f.out[8], 0xFF);
-    CHECK_EQ(f.out[9], 0xFF);
-    CHECK_EQ(f.out[10], 0xFF);
+    /* CNS 16014:2025 table 14, by number rather than by named offset. */
+    CHECK_EQ(f.out_len, 15);
+    CHECK_EQ(f.out[0], 15);                   /* 13 overhead + 2 data      */
+    CHECK_EQ(f.out[2], 0x00);                 /* service type: read        */
+    CHECK_EQ(f.out[3], 0x00);                 /* service id, two bytes     */
+    CHECK_EQ(f.out[4], 0x20);
+    CHECK_EQ(f.out[5], 0x00);                 /* reserved                  */
+    CHECK_EQ(f.out[6], 0x00);
+    CHECK_EQ(f.out[7], 0x00);                 /* fragment                  */
+    CHECK_EQ(f.out[8], 0x00);
+    CHECK_EQ(f.out[9], 0x21);                 /* data type                 */
+    CHECK_EQ(f.out[10], 0xFF);                /* asking, not telling       */
+    CHECK_EQ(f.out[11], 0xFF);
+    CHECK_EQ(f.out[12], 0xFF);
+    CHECK_EQ(f.out[13], 0xFF);
 
     n = mb_reply(reply, 0, 0xE0, 0x20, 0x21, 2, 0x5A);
     feed(&f, reply, n);
@@ -787,12 +799,14 @@ static void a_multibyte_write_carries_its_items(void)
     CHECK_EQ(link_submit(&l, &req), RES_OK);
     CHECK_EQ(link_poll(&l, &resp), RES_EAGAIN);
 
-    CHECK_EQ(f.out_len, TS_MB_OVERHEAD + 4u);
-    CHECK_EQ(f.out[2], TS_SVC_WRITE_BIT | 0x40);
-    CHECK_EQ(f.out[6], 0x22);
-    CHECK_EQ(f.out[7], 0x00);
-    CHECK_EQ(f.out[8], 0x01);
-    CHECK(memcmp(f.out + TS_MB_DATA_OFFSET, data, sizeof(data)) == 0);
+    CHECK_EQ(f.out_len, 17);
+    CHECK_EQ(f.out[2], TS_SVC_WRITE_BIT);     /* write, and only that      */
+    CHECK_EQ(f.out[3], 0x00);
+    CHECK_EQ(f.out[4], 0x40);
+    CHECK_EQ(f.out[9], 0x22);
+    CHECK_EQ(f.out[10], 0x00);
+    CHECK_EQ(f.out[11], 0x01);
+    CHECK(memcmp(f.out + 12, data, sizeof(data)) == 0);
     CHECK_EQ(f.out[f.out_len - 1u],
              ts_checksum(f.out, f.out_len - 1u));
 }

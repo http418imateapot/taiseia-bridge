@@ -40,14 +40,29 @@
  *
  * A different packet layout, used by appliances that report values wider than
  * two bytes -- meters and sensors. The header is longer and carries the data
- * type and item count that the general format has nowhere to put:
+ * type and item count that the general format has nowhere to put. Offsets are
+ * those of CNS 16014:2025 tables 14 (request) and 15 (response), which share
+ * one layout:
  *
- *   [0] length  [1] SA id  [2] R/W + service  [3] reserved
- *   [4..5] fragment  [6] data type  [7..8] item count  [9..] data  [N-1] xor
+ *   [0] length  [1] SA id  [2] service type: bit 7 R/W, bits 6..0 reserved
+ *   [3..4] service id  [5..6] reserved  [7..8] fragment  [9] data type
+ *   [10..11] item count  [12..] data  [N-1] xor
+ *
+ * Unlike the general format, byte 2 does not hold the service id: the id has
+ * two bytes of its own. Every multi-byte field is big endian.
  */
-#define TS_MB_OVERHEAD          10u
-#define TS_MB_DATA_OFFSET       9u
-#define TS_MB_RESERVED          0xFFu
+#define TS_MB_OFF_SERVICE_TYPE  2u
+#define TS_MB_OFF_SERVICE_ID    3u
+#define TS_MB_OFF_RESERVED      5u
+#define TS_MB_OFF_FRAGMENT      7u
+#define TS_MB_OFF_DTYPE         9u
+#define TS_MB_OFF_COUNT         10u
+#define TS_MB_DATA_OFFSET       12u
+#define TS_MB_OVERHEAD          13u   /* header + checksum */
+
+/* What we send in the reserved fields. The standard's default for the
+ * two-byte field is 0x0000, and bits 6..0 of the service type byte are 0. */
+#define TS_MB_RESERVED          0x0000u
 
 /* The count field of a read request: we are asking, not telling. */
 #define TS_MB_COUNT_UNSPECIFIED 0xFFFFu
@@ -70,12 +85,21 @@
 
 /* -------------------------------------------------------- service and role --
  *
- * Byte 2 packs the access direction into the top bit and the service id into
- * the remaining seven.
+ * In the general format, byte 2 packs the access direction into the top bit
+ * and the service id into the remaining seven. The multi-byte format keeps the
+ * direction in the same bit of the same byte and moves the id out to two bytes
+ * of its own; see above.
+ *
+ * Everything above the frame layer -- capabilities, the appliance model, the
+ * link port, MQTT -- holds a service id as uint16_t, wide enough for either
+ * format. TS_SVC_ID_MAX is the general format's ceiling: its builders refuse
+ * an id above it rather than mask it, so 0x0120 can never go out as 0x20.
+ * TS_MB_SVC_ID_MAX is the widest id any format can name.
  */
 #define TS_SVC_ID_MASK          0x7Fu
 #define TS_SVC_WRITE_BIT        0x80u
 #define TS_SVC_ID_MAX           TS_SVC_ID_MASK
+#define TS_MB_SVC_ID_MAX        0xFFFFu
 
 /* SA id 0x00 is reserved for the registration exchange, through which an
  * appliance reports its own class, protocol version, make, model and the set
@@ -116,11 +140,19 @@ TS_STATIC_ASSERT(TS_FRAME_MAX_LEN < 255u,                max_len_reserves_ff);
 TS_STATIC_ASSERT(TS_GENERAL_REQ_LEN >= TS_FRAME_MIN_LEN, general_req_is_valid);
 TS_STATIC_ASSERT(TS_DATA_MAX > 0,                        data_max_positive);
 TS_STATIC_ASSERT((TS_SVC_ID_MASK & TS_SVC_WRITE_BIT) == 0, service_byte_split);
+TS_STATIC_ASSERT(TS_MB_SVC_ID_MAX > TS_SVC_ID_MAX,       mb_svc_id_is_wider);
 TS_STATIC_ASSERT(TS_REG_FRAME_OVERHEAD < TS_FRAME_OVERHEAD,  reg_has_no_svc_byte);
 TS_STATIC_ASSERT(TS_DATA_MAX >= TS_FRAME_MAX_LEN - TS_FRAME_OVERHEAD,
                                                              data_max_covers_all);
 TS_STATIC_ASSERT(TS_MB_OVERHEAD > TS_FRAME_MIN_LEN,          mb_header_is_longer);
 TS_STATIC_ASSERT(TS_MB_DATA_OFFSET + 1u == TS_MB_OVERHEAD,   mb_offsets_agree);
+TS_STATIC_ASSERT(TS_MB_OFF_SERVICE_ID == TS_MB_OFF_SERVICE_TYPE + 1u,
+                                                             mb_id_follows_type);
+TS_STATIC_ASSERT(TS_MB_OFF_RESERVED == TS_MB_OFF_SERVICE_ID + 2u, mb_id_is_two);
+TS_STATIC_ASSERT(TS_MB_OFF_FRAGMENT == TS_MB_OFF_RESERVED + 2u,   mb_rsv_is_two);
+TS_STATIC_ASSERT(TS_MB_OFF_DTYPE == TS_MB_OFF_FRAGMENT + 2u,      mb_frag_is_two);
+TS_STATIC_ASSERT(TS_MB_OFF_COUNT == TS_MB_OFF_DTYPE + 1u,         mb_dtype_is_one);
+TS_STATIC_ASSERT(TS_MB_DATA_OFFSET == TS_MB_OFF_COUNT + 2u,       mb_count_is_two);
 TS_STATIC_ASSERT(TS_REASSEMBLY_MAX >= TS_DATA_MAX,           reassembly_holds_one);
 
 #endif /* TSB_CORE_TAISEIA_LIMITS_H */

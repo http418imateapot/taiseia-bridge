@@ -66,14 +66,12 @@ const ts_registration_t *appl_identity(const appliance_t *a)
     return &a->reg;
 }
 
-result_t appl_value(const appliance_t *a, uint8_t service_id, uint16_t *out)
+result_t appl_value(const appliance_t *a, uint16_t service_id, uint16_t *out)
 {
     size_t i;
 
     if (!a || !out)
         return RES_EINVAL;
-
-    service_id = (uint8_t)(service_id & TS_SVC_ID_MASK);
 
     for (i = 0; i < a->n_values; i++) {
         if (a->values[i].service_id != service_id)
@@ -87,14 +85,12 @@ result_t appl_value(const appliance_t *a, uint8_t service_id, uint16_t *out)
     return RES_ENOTFOUND;
 }
 
-const appl_value_t *appl_reading(const appliance_t *a, uint8_t service_id)
+const appl_value_t *appl_reading(const appliance_t *a, uint16_t service_id)
 {
     size_t i;
 
     if (!a)
         return NULL;
-
-    service_id = (uint8_t)(service_id & TS_SVC_ID_MASK);
 
     for (i = 0; i < a->n_values; i++) {
         if (a->values[i].service_id != service_id)
@@ -199,7 +195,7 @@ static void adopt_registration(appliance_t *a, int64_t now_ms)
 static void abandon(appliance_t *a, int64_t now_ms);
 
 static result_t start(appliance_t *a, link_t *link, appl_op_t op,
-                      uint8_t service_id, uint16_t value, int64_t now_ms)
+                      uint16_t service_id, uint16_t value, int64_t now_ms)
 {
     link_req_t req;
     result_t   r;
@@ -277,7 +273,7 @@ static result_t start(appliance_t *a, link_t *link, appl_op_t op,
 
 /* --------------------------------------------------------------- outcomes */
 
-static void note_read_failure(appliance_t *a, uint8_t service_id)
+static void note_read_failure(appliance_t *a, uint16_t service_id)
 {
     size_t i;
 
@@ -292,7 +288,7 @@ static void note_read_failure(appliance_t *a, uint8_t service_id)
     }
 }
 
-static appl_value_t *value_slot(appliance_t *a, uint8_t service_id)
+static appl_value_t *value_slot(appliance_t *a, uint16_t service_id)
 {
     size_t i;
 
@@ -303,7 +299,7 @@ static appl_value_t *value_slot(appliance_t *a, uint8_t service_id)
     return NULL;
 }
 
-static void note_read_success(appliance_t *a, uint8_t service_id,
+static void note_read_success(appliance_t *a, uint16_t service_id,
                               uint16_t value, int64_t now_ms)
 {
     appl_value_t *v = value_slot(a, service_id);
@@ -456,7 +452,13 @@ static void handle_reply(appliance_t *a, link_t *link, const link_resp_t *resp,
 
     case APPL_OP_READ:
         if (resp->multibyte) {
-            note_read_success_mb(a, resp, now_ms);
+            /* The reading is filed under the id the reply names, so a reply
+             * naming some other service than the one asked about -- 0x20 in
+             * answer to 0x0120 -- is a failed read, not a reading of 0x20. */
+            if (resp->service_id == a->op_service)
+                note_read_success_mb(a, resp, now_ms);
+            else
+                note_read_failure(a, a->op_service);
         } else if (resp->data_len >= 2u) {
             uint16_t v = (uint16_t)(((uint16_t)resp->data[0] << 8) |
                                     resp->data[1]);
@@ -629,8 +631,10 @@ result_t appl_write_begin(appliance_t *a, const appl_write_item_t *items,
     for (i = 0; i < n; i++) {
         const ts_capability_t *cap;
 
-        a->write.items[i].service_id = (uint8_t)(items[i].service_id &
-                                                 TS_SVC_ID_MASK);
+        /* Taken whole. An id the appliance did not declare -- including
+         * anything above 0x7F on a general-format appliance -- is `unknown`
+         * below, never masked into one it did. */
+        a->write.items[i].service_id = items[i].service_id;
         a->write.items[i].value      = items[i].value;
 
         /* Resolve what the capability set already answers, without spending a

@@ -11,11 +11,16 @@
 
 /* An attribute key is the service identifier written in decimal. Nothing else
  * is accepted -- not "03", not " 3", not "0x03". A key we half-understand
- * would address a service the sender did not name. */
-static bool key_to_service(const char *js, const jr_tok_t *t, uint8_t *out)
+ * would address a service the sender did not name.
+ *
+ * The range is the multi-byte format's, 0..65535, whatever the appliance's
+ * format: whether the appliance has that service is the capability check's
+ * question, and it answers `unknown`. A key above 65535 names no service in
+ * either format and refuses the command. */
+static bool key_to_service(const char *js, const jr_tok_t *t, uint16_t *out)
 {
     int      i;
-    unsigned v = 0;
+    uint32_t v = 0;
     int      digits = 0;
 
     if (t->type != JR_STRING)
@@ -26,18 +31,18 @@ static bool key_to_service(const char *js, const jr_tok_t *t, uint8_t *out)
 
         if (c < '0' || c > '9')
             return false;
-        v = v * 10u + (unsigned)(c - '0');
+        v = v * 10u + (uint32_t)(c - '0');
         digits++;
-        if (v > TS_SVC_ID_MAX)
+        if (v > TS_MB_SVC_ID_MAX)
             return false;
     }
 
-    if (digits == 0 || digits > 3)
+    if (digits == 0 || digits > 5)
         return false;
     if (digits > 1 && js[t->start] == '0')
         return false;                       /* no leading zeros */
 
-    *out = (uint8_t)v;
+    *out = (uint16_t)v;
     return true;
 }
 
@@ -85,7 +90,7 @@ result_t control_parse(const char *payload, size_t len, control_cmd_t *out)
         return RES_EFORMAT;
 
     while ((k = jr_obj_iter(toks, count, attrs, &cursor)) >= 0) {
-        uint8_t  service = 0;
+        uint16_t service = 0;
         uint16_t value = 0;
 
         if (k + 1 >= count)

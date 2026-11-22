@@ -71,6 +71,8 @@ result_t ts_reasm_add(ts_reasm_t *r, const uint8_t *pkt, size_t len)
         if (res != RES_OK)
             return res;
 
+        /* The whole sixteen-bit id is kept and compared, so a fragment for
+         * 0x0120 can never be joined onto a reply for 0x20. */
         if (!r->started) {
             r->sa_id      = f.sa_id;
             r->service_id = f.service_id;

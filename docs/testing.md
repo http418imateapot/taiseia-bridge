@@ -61,6 +61,21 @@ on both sides narrows the gap — a framing error that only one side makes will
 show up — but agreement between two things derived from one reading is not
 evidence about the wire.
 
+**It has happened.** The multi-byte header was transcribed with the service id
+in the low seven bits of byte 2 and a one-byte reserved field. CNS 16014:2025
+tables 14 and 15 give byte 2 to the access bit alone, the service id two bytes
+of its own, and the reserved field two — so from the reserved field on, every
+offset was three bytes short, and multi-byte registration records (table 24)
+were two bytes short. Every test passed: the simulator builds its replies with
+the same functions it is meant to check, and the tests that wrote bytes by hand
+wrote the same misreading. It was found by reading the tables against the code,
+not by anything in CI.
+
+The multi-byte tests now write their packets out by hand at the tables'
+offsets, so a builder and a parser that agree on a wrong layout cannot pass
+together. That makes those tests a second transcription, not a check against
+the wire; only an appliance can be that.
+
 ## The broker integration test
 
 `scripts/integration-broker.sh` starts a real mosquitto, runs the bridge

@@ -155,7 +155,7 @@ static int do_identify(link_t *l)
     return 0;
 }
 
-static int do_read(link_t *l, uint8_t sa, uint8_t service)
+static int do_read(link_t *l, uint8_t sa, uint16_t service)
 {
     link_req_t  req;
     link_resp_t resp;
@@ -188,7 +188,7 @@ static int do_read(link_t *l, uint8_t sa, uint8_t service)
     return 0;
 }
 
-static int do_write(link_t *l, uint8_t sa, uint8_t service, uint16_t value)
+static int do_write(link_t *l, uint8_t sa, uint16_t service, uint16_t value)
 {
     link_req_t  req;
     link_resp_t resp;
@@ -342,12 +342,14 @@ int main(int argc, char *argv[])
     } else if (strcmp(argv[i], "read") == 0 && i + 3 == argc) {
         unsigned long sa = 0, svc = 0;
 
+        /* `read` and `write` issue general-format requests, whose service id
+         * is seven bits: a wider one is refused here, not masked. */
         if (!parse_num(argv[i + 1], &sa, 0xFF) ||
             !parse_num(argv[i + 2], &svc, TS_SVC_ID_MAX)) {
             fprintf(stderr, "bad arguments to read\n");
             rc = 2;
         } else {
-            rc = do_read(&link, (uint8_t)sa, (uint8_t)svc);
+            rc = do_read(&link, (uint8_t)sa, (uint16_t)svc);
         }
     } else if (strcmp(argv[i], "write") == 0 && i + 4 == argc) {
         unsigned long sa = 0, svc = 0, val = 0;
@@ -358,7 +360,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "bad arguments to write\n");
             rc = 2;
         } else {
-            rc = do_write(&link, (uint8_t)sa, (uint8_t)svc, (uint16_t)val);
+            rc = do_write(&link, (uint8_t)sa, (uint16_t)svc, (uint16_t)val);
         }
     } else {
         usage(argv[0]);

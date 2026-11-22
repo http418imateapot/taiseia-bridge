@@ -253,7 +253,8 @@ static void an_unknown_type_code_stops_the_stream(void)
     uint8_t           p[64];
     size_t            len = make_payload(p, 0x80, 0x03);   /* multi-byte */
 
-    p[len++] = 0x20;                /* service 0x20 */
+    p[len++] = 0x00;                /* service type: read only */
+    p[len++] = 0x00; p[len++] = 0x20;   /* service 0x0020 */
     p[len++] = 0xAA;                /* no such type code */
     p[len++] = 0x00; p[len++] = 0x00;
 
@@ -261,10 +262,130 @@ static void an_unknown_type_code_stops_the_stream(void)
 
     /* The string type has no fixed support width, so it lands the same way. */
     len = make_payload(p, 0x80, 0x03);
-    p[len++] = 0x20;
+    p[len++] = 0x00;
+    p[len++] = 0x00; p[len++] = 0x20;
     p[len++] = 0x50;                /* STRING */
     p[len++] = 0x08;
     CHECK_EQ(ts_registration_parse(p, len, &reg), RES_EUNSUPPORTED);
+}
+
+/*
+ * A multi-byte capability record, written out by hand from CNS 16014:2025
+ * table 24 rather than produced by the simulator: service type, a two-byte
+ * service id, the type code, then support data as wide as the type says.
+ * The simulator builds its registration with the same reading as the parser,
+ * so a round trip through it cannot catch a record that is the wrong shape.
+ */
+static void a_multibyte_record_is_read_at_the_tables_offsets(void)
+{
+    ts_registration_t reg;
+    uint8_t           p[64];
+    size_t            len = make_payload(p, 0x83, 0x03);   /* multi-byte sensor */
+    const ts_capability_t *c;
+
+    /* Read only, service 0x0020, UINT16, range 0x0000..0x2710. */
+    p[len++] = 0x00;
+    p[len++] = 0x00; p[len++] = 0x20;
+    p[len++] = 0x21;
+    p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x27; p[len++] = 0x10;
+
+    /* Writable, service 0x0021, ENUM16_Bit, mask 0x0F05. */
+    p[len++] = 0x80;
+    p[len++] = 0x00; p[len++] = 0x21;
+    p[len++] = 0x10;
+    p[len++] = 0x0F; p[len++] = 0x05;
+
+    CHECK_EQ(ts_registration_parse(p, len, &reg), RES_OK);
+    CHECK_EQ(reg.format, TS_FORMAT_MULTIBYTE);
+    CHECK_EQ(reg.n_caps, 2);
+
+    c = ts_registration_find(&reg, 0x20);
+    CHECK(c != NULL);
+    if (c) {
+        CHECK_EQ(c->writable, 0);
+        CHECK_EQ(c->dtype, 0x21);
+        CHECK_EQ(c->support_len, 4);
+        CHECK_EQ(c->support[2], 0x27);
+        CHECK_EQ(c->support[3], 0x10);
+    }
+
+    c = ts_registration_find(&reg, 0x21);
+    CHECK(c != NULL);
+    if (c) {
+        CHECK_EQ(c->writable, 1);
+        CHECK_EQ(c->dtype, 0x10);
+        CHECK_EQ(c->support_len, 2);
+        CHECK_EQ((c->support[0] << 8) | c->support[1], 0x0F05);
+    }
+}
+
+/*
+ * The record has two bytes of service id, and all sixteen bits are kept.
+ * 0x0120 masked to seven bits is 0x20 -- another real service -- so an
+ * appliance declaring both must come out with two capabilities, each found
+ * under its own id and never under the other's.
+ */
+static void a_two_byte_service_id_is_kept_apart_from_its_low_byte(void)
+{
+    ts_registration_t      reg;
+    uint8_t                p[64];
+    size_t                 len = make_payload(p, 0x80, 0x03);
+    const ts_capability_t *wide;
+    const ts_capability_t *narrow;
+
+    p[len++] = 0x80;                    /* writable                     */
+    p[len++] = 0x01; p[len++] = 0x20;   /* service 0x0120               */
+    p[len++] = 0x21;
+    p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x01;
+
+    p[len++] = 0x00;                    /* read only                    */
+    p[len++] = 0x00; p[len++] = 0x20;   /* service 0x0020               */
+    p[len++] = 0x21;
+    p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x02;
+
+    CHECK_EQ(ts_registration_parse(p, len, &reg), RES_OK);
+    CHECK_EQ(reg.n_caps, 2);
+    CHECK_EQ(reg.caps[0].service_id, 0x0120);
+    CHECK_EQ(reg.caps[1].service_id, 0x0020);
+
+    wide   = ts_registration_find(&reg, 0x0120);
+    narrow = ts_registration_find(&reg, 0x0020);
+    CHECK(wide != NULL);
+    CHECK(narrow != NULL);
+    CHECK(wide != narrow);
+    if (wide && narrow) {
+        CHECK_EQ(wide->service_id, 0x0120);
+        CHECK_EQ(wide->writable, 1);
+        CHECK_EQ(wide->support[3], 0x01);
+        CHECK_EQ(narrow->service_id, 0x0020);
+        CHECK_EQ(narrow->writable, 0);
+        CHECK_EQ(narrow->support[3], 0x02);
+    }
+
+    /* Another id with the same low byte was not declared and is not found. */
+    CHECK(ts_registration_find(&reg, 0x0220) == NULL);
+    CHECK(ts_registration_find(&reg, 0x00A0) == NULL);
+
+    /* The widest id the field can hold. */
+    len = make_payload(p, 0x80, 0x03);
+    p[len++] = 0x00;
+    p[len++] = 0xFF; p[len++] = 0xFF;
+    p[len++] = 0x21;
+    p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x01;
+    CHECK_EQ(ts_registration_parse(p, len, &reg), RES_OK);
+    CHECK_EQ(reg.n_caps, 1);
+    CHECK_EQ(reg.caps[0].service_id, 0xFFFF);
+    CHECK(ts_registration_find(&reg, 0xFFFF) != NULL);
+    CHECK(ts_registration_find(&reg, 0x7F) == NULL);
+
+    /* A general-format appliance's ids are seven bits, and asking it for a
+     * wide one does not find the service its low byte happens to name. */
+    len = make_payload(p, 0x00, 0x03);
+    p[len++] = 0x20; p[len++] = 0x00; p[len++] = 0x01;
+    CHECK_EQ(ts_registration_parse(p, len, &reg), RES_OK);
+    CHECK(ts_registration_find(&reg, 0x0020) != NULL);
+    CHECK(ts_registration_find(&reg, 0x0120) == NULL);
+    CHECK(ts_registration_find(&reg, 0x00A0) == NULL);
 }
 
 /*
@@ -318,6 +439,8 @@ void test_registration(void)
     a_fragmented_reply_is_refused();
     a_malformed_payload_is_refused();
     an_unknown_type_code_stops_the_stream();
+    a_multibyte_record_is_read_at_the_tables_offsets();
+    a_two_byte_service_id_is_kept_apart_from_its_low_byte();
     too_many_services_is_refused();
     the_support_buffer_fits_every_known_type();
 }

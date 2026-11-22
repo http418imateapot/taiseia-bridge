@@ -25,7 +25,8 @@
  * TWO RECORD FORMATS, and the difference matters more than it looks.
  *
  *   General (3 bytes)     [service | write bit] [support high] [support low]
- *   Multi-byte (2+N)      [service | write bit] [type code] [support ...]
+ *   Multi-byte (4+N)      [type: write bit] [service id, 2 bytes] [type code]
+ *                         [support ...]
  *
  * Only the multi-byte format carries a data type code. For a general-format
  * appliance the two support bytes could be a range, a maximum, or a bit mask,
@@ -59,6 +60,16 @@
 
 #define TS_REG_GENERAL_RECORD  3u   /* service byte + two support bytes */
 
+/*
+ * A multi-byte record, CNS 16014:2025 table 24: a service type byte (bit 7 is
+ * the access direction, bits 6..0 reserved), a two-byte service id, the data
+ * type code, then the support data, whose width the type code decides. This
+ * is what precedes the support data.
+ */
+#define TS_REG_MB_RECORD_HEADER 4u
+#define TS_REG_MB_OFF_ID        1u  /* two bytes, big endian */
+#define TS_REG_MB_OFF_DTYPE     3u
+
 typedef enum {
     TS_FORMAT_GENERAL = 0,   /* 3-byte records, no type code            */
     TS_FORMAT_MULTIBYTE      /* type code present, variable support data */
@@ -71,7 +82,7 @@ typedef enum {
 #define TS_CLASS_SENSOR      3u
 
 typedef struct {
-    uint8_t  service_id;
+    uint16_t service_id;                     /* 7 bits general, 16 multi-byte */
     bool     writable;
     bool     dtype_known;                    /* multi-byte format only     */
     uint8_t  dtype;                          /* valid when dtype_known     */
@@ -114,8 +125,14 @@ result_t ts_registration_parse(const uint8_t *data, size_t len,
 /** Link speed in bits per second, or 0 when the code is not one we know. */
 uint32_t ts_baud_from_code(uint8_t code);
 
-/** Find a capability by service id; NULL when the appliance did not offer it. */
+/**
+ * Find a capability by service id; NULL when the appliance did not offer it.
+ *
+ * The id is compared whole. 0x0120 and 0x20 are different services, and a
+ * general-format appliance, whose ids are seven bits, offers neither 0x0120
+ * nor anything else above 0x7F.
+ */
 const ts_capability_t *ts_registration_find(const ts_registration_t *reg,
-                                            uint8_t service_id);
+                                            uint16_t service_id);
 
 #endif /* TSB_CORE_TAISEIA_REGISTRATION_H */

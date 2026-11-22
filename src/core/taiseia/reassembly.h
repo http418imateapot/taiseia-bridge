@@ -11,7 +11,7 @@
  * WHAT THE STANDARD SETTLES, AND WHAT IT DOES NOT.
  *
  * For a multi-byte reply it is explicit: every fragment carries the same
- * header, its own fragment number at bytes 4 and 5, and the count of the items
+ * header, its own fragment number at bytes 7 and 8, and the count of the items
  * *in that fragment*. Concatenating the data fields and summing the counts is
  * the whole of it.
  *
@@ -43,7 +43,7 @@ typedef struct {
     uint32_t count;        /* items, summed across fragments   */
     uint8_t  dtype;
     uint8_t  sa_id;
-    uint8_t  service_id;
+    uint16_t service_id;   /* the whole two-byte field, for a multi-byte reply */
     bool     write;
 
     unsigned fragments;
@@ -63,7 +63,8 @@ void ts_reasm_begin(ts_reasm_t *r, ts_reply_kind_t kind);
  *
  * Refuses rather than assembles something plausible: a fragment number that
  * does not count down, more bytes than the buffer holds, a packet that does
- * not decode, or a continuation that is missing the header it must repeat.
+ * not decode, a continuation that is missing the header it must repeat, or a
+ * multi-byte fragment naming a different service id or type than the first.
  */
 result_t ts_reasm_add(ts_reasm_t *r, const uint8_t *pkt, size_t len);
 
